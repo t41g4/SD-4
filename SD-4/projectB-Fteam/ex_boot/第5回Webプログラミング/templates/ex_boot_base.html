@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ja" class="h-100">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>基本レイアウト用のテンプレート</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.5/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-
+SgOJa3DmI69IUzQ2PVdRZhwQ+dy64/BUtbMJw1MZ8t5HZApcHrRKUc4W0kG879m7" crossorigin="anonymous">
+<link href="../static/boot.css" rel="stylesheet">
+</head>
+<body class="d-flex flex-column h-100">
+    <!-- ヘッダー部分 -->
+    <header>
+    <nav class="navbar navbar-expand-md fixed-top bg-primary" data-bs-theme="dark">
+    <div class="container-fluid">
+    <a class="navbar-brand" href="#">Webプログラミング</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" ariacontrols="
+    navbarCollapse" aria-expanded="false" aria-label="Toggle navigation">
+    <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarCollapse">
+    <ul class="navbar-nav me-auto mb-2 mb-md-0">
+    <li class="nav-item"><a class="nav-link" href="/">Bootstrapの基本レイアウト</a></li>
+    <li class="nav-item"><a class="nav-link" href="/web">Webプログラミングとは</a></li>
+    <li class="nav-item"><a class="nav-link" href="/python">PyhonとFlask</a></li>
+    <li class="nav-item"><a class="nav-link" href="/boot">Bootstrapとは</a></li>
+    </ul>
+    </div>
+    </div>
+    </nav>
+    </header>
+{% block content %}{% endblock %}
+{% block footer %}
+<footer class="footer mt-auto py-3 bg-primary" data-bs-theme="dark">
+<div class="container text-end">
+<span class="text-light">Webプログラミング（火曜日5時間目7201教室）</span>
+</div>
+</footer>
+{% endblock %}
+{% block script %}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.5/dist/js/bootstrap.bundle.min.js" integrity="sha384-
+k6d4wzSIapyDyv1kpU366/PK5hCdSbCRGRCMv+eplOQJWyd1fbcAu9OCUj5zNLiq" crossorigin="anonymous"></script>
+{% endblock %}
+</body>
+</html>
