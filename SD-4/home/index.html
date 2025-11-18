@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
-  <title>湘南台ルート管理（最大10スロット）</title>
+  <title>ルート管理（最大10スロット）</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
@@ -68,8 +68,6 @@
     const map = L.map('map', {
       center: shonandaiBounds.getCenter(),
       zoom: 15,
-      maxBounds: shonandaiBounds.pad(0.03),
-      maxBoundsViscosity: 1.0
     });
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors'
@@ -100,10 +98,6 @@
 
     // ===== markers =====
     function addMarker(latlng) {
-      if (!isInsideShonandai(latlng)) {
-        setStatus('湘南台エリア外のためマーカーは追加できません。');
-        return;
-      }
       const m = L.marker(latlng, { draggable: true }).addTo(map);
       m.on('dragend', () => {
         const p = m.getLatLng();
@@ -345,6 +339,32 @@
     // initial
     refreshSlotList();
     map.fitBounds(shonandaiBounds);
+
+    // ---- 現在地を取得して地図中央に表示 ----
+    if (navigator.geolocation) {
+      setStatus("現在地を取得しています…");
+      
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          const current = L.latLng(lat, lng);
+
+          // 現在地をマーカー表示
+          const m = L.marker(current).addTo(map);
+          setStatus("現在地を中心に表示しました。");
+
+      // 地図を現在地に移動
+          map.setView(current, 16);
+        },
+        (err) => {
+          setStatus("現在地を取得できませんでした: " + err.message);
+        }
+      );
+    } else {
+      setStatus("このブラウザは位置情報に対応していません。");
+    }
+// ---- 現在地取得ここまで ----
   </script>
 </body>
 </html>
