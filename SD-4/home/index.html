@@ -2,83 +2,106 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
-  <title>Leaflet - 湘南台エリア限定</title>
+  <title>湘南台ルート管理（最大10スロット）</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
   <style>
     body { margin:0; font-family: system-ui, "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif; }
-    #map { height: 80vh; width: 100%; }
-    .controls { padding: 8px; }
+    #map { height: 70vh; width: 100%; }
+    .controls { padding: 8px; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.08); z-index: 400; }
     button { margin-right: 6px; }
     #status { margin-left: 8px; color: #333; }
+    #slot-list { margin-top: 6px; }
+    .slot-item { margin-right: 10px; display:inline-block; white-space:nowrap; cursor: pointer; padding: 2px 6px; border-radius: 4px; }
+    .slot-item.saved { font-weight:600; color: #fff; background: #2a6fdb; }
+    .slot-item.empty { color: #666; background: #f0f0f0; }
   </style>
 </head>
 <body>
   <div class="controls">
     <button id="btn-clear">マーカーをクリア</button>
-    <button id="btn-draw">経路を描画</button>
+    <button id="btn-draw">経路を描画 (OSRM)</button>
     <button id="btn-save">ルートを保存</button>
     <button id="btn-load">保存ルートを読み込み</button>
-    <span id="status">湘南台エリア内のみ許可されています。クリックで追加してください。</span>
+
+    <label for="route-slot" style="margin-left:8px;">保存スロット：</label>
+    <select id="route-slot" style="margin-right:8px;">
+      <option value="0">Slot 1</option>
+      <option value="1">Slot 2</option>
+      <option value="2">Slot 3</option>
+      <option value="3">Slot 4</option>
+      <option value="4">Slot 5</option>
+      <option value="5">Slot 6</option>
+      <option value="6">Slot 7</option>
+      <option value="7">Slot 8</option>
+      <option value="8">Slot 9</option>
+      <option value="9">Slot 10</option>
+    </select>
+    <button id="btn-overwrite">上書き確認ありで保存</button>
+
+    <span id="status">湘南台エリア内で操作してください。</span>
+
+    <div id="slot-list" aria-live="polite"></div>
   </div>
 
   <div id="map"></div>
 
+  <!-- Leaflet -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+  <!-- Turf.js for geometry ops -->
+  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
 
   <script>
-    // === 湘南台（概算）の bbox（外接矩形） ===
-    // 中心参考: 湘南台駅 35.39639, 139.46667 (出典: Wikipedia / Navitime)
-    // bbox は駅周辺をカバーする概算値（必要なら値を調整してください）
+    // ===== 湘南台 bbox（概算） =====
     const SHONANDAI_BBOX = {
       minLat: 35.3880,
       minLng: 139.4580,
       maxLat: 35.4050,
       maxLng: 139.4765
     };
-
     const shonandaiBounds = L.latLngBounds(
       [SHONANDAI_BBOX.minLat, SHONANDAI_BBOX.minLng],
       [SHONANDAI_BBOX.maxLat, SHONANDAI_BBOX.maxLng]
     );
 
-    // 地図初期化（湘南台周辺にフィット）
+    // ===== map init =====
     const map = L.map('map', {
       center: shonandaiBounds.getCenter(),
       zoom: 15,
-      maxBounds: shonandaiBounds.pad(0.03), // 少し余白を持たせる
+      maxBounds: shonandaiBounds.pad(0.03),
       maxBoundsViscosity: 1.0
     });
-
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
+    // ===== state =====
     let markers = [];
     let markerPositions = [];
-    let routingControl = null;
     let polyline = null;
+    let arrowsLayer = L.layerGroup().addTo(map); // 矢印用レイヤ
     const statusEl = document.getElementById('status');
+    const slotListEl = document.getElementById('slot-list');
+
     function setStatus(msg) { statusEl.textContent = msg; }
 
+    // ===== util =====
     function isInsideShonandai(latlng) {
       return latlng.lat >= SHONANDAI_BBOX.minLat &&
              latlng.lat <= SHONANDAI_BBOX.maxLat &&
              latlng.lng >= SHONANDAI_BBOX.minLng &&
              latlng.lng <= SHONANDAI_BBOX.maxLng;
     }
-
     function clampToShonandai(latlng) {
       const lat = Math.max(SHONANDAI_BBOX.minLat, Math.min(SHONANDAI_BBOX.maxLat, latlng.lat));
       const lng = Math.max(SHONANDAI_BBOX.minLng, Math.min(SHONANDAI_BBOX.maxLng, latlng.lng));
       return L.latLng(lat, lng);
     }
 
+    // ===== markers =====
     function addMarker(latlng) {
       if (!isInsideShonandai(latlng)) {
-        setStatus('湘南台エリア外のため、マーカーは追加できません。');
+        setStatus('湘南台エリア外のためマーカーは追加できません。');
         return;
       }
       const m = L.marker(latlng, { draggable: true }).addTo(map);
@@ -94,7 +117,7 @@
       markers.push(m);
       markerPositions.push({ lat: latlng.lat, lng: latlng.lng });
       updatePolyline();
-      setStatus(`マーカー数: ${markers.length}`);
+      setStatus('マーカー数: ' + markers.length);
     }
 
     function syncPositionsFromMarkers() {
@@ -105,7 +128,7 @@
     }
 
     function clearMarkers() {
-      if (routingControl) { map.removeControl(routingControl); routingControl = null; }
+      clearArrows();
       if (polyline) { map.removeLayer(polyline); polyline = null; }
       markers.forEach(m => map.removeLayer(m));
       markers = [];
@@ -123,75 +146,204 @@
       }
     }
 
-    function drawRouting() {
-      if (markers.length < 2) { setStatus('マーカーは2つ以上必要です。'); return; }
-      // 全点が湘南台内かチェック
-      if (!markers.every(m => isInsideShonandai(m.getLatLng()))) {
-        setStatus('ルート上の全ウェイポイントは湘南台エリア内である必要があります。');
+    // ===== OSRM routing (free public API) =====
+    async function drawRouting() {
+      if (markers.length < 2) {
+        setStatus('マーカーを2つ以上置いてください。');
         return;
       }
-      if (routingControl) { map.removeControl(routingControl); routingControl = null; }
-      const waypoints = markers.map(m => m.getLatLng());
-      routingControl = L.Routing.control({
-        waypoints: waypoints,
-        router: L.Routing.osrmv1(),
-        show: true,
-        addWaypoints: false,
-        routeWhileDragging: true
-      }).addTo(map);
-      setStatus('経路を描画しました（OSRMデモサーバ）。');
+      if (!markers.every(m => isInsideShonandai(m.getLatLng()))) {
+        setStatus('全マーカーは湘南台エリア内である必要があります。');
+        return;
+      }
+      const coords = markers.map(m => {
+        const p = m.getLatLng();
+        return p.lng + ',' + p.lat;
+      }).join(';');
+      const url = 'https://router.project-osrm.org/route/v1/driving/' + coords + '?overview=full&geometries=geojson';
+      try {
+        setStatus('ルート取得中... (OSRM)');
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        if (!data.routes || data.routes.length === 0) {
+          setStatus('ルートが見つかりませんでした。');
+          return;
+        }
+        const route = data.routes[0];
+        // remove old
+        if (polyline) { map.removeLayer(polyline); polyline = null; }
+        clearArrows();
+
+        // draw new route
+        polyline = L.geoJSON(route.geometry, { style: { color: '#2b8cff', weight: 6, opacity: 0.8 } }).addTo(map);
+        map.fitBounds(polyline.getBounds().pad(0.1));
+
+        // show summary
+        const min = Math.round(route.duration / 60);
+        const km = (route.distance / 1000).toFixed(2);
+        setStatus('ルート描画完了 — 約 ' + min + ' 分、' + km + ' km。');
+
+        // add arrows every ~10m
+        addArrowsToRoute(route.geometry, 10);
+      } catch (err) {
+        setStatus('OSRM ルート取得エラー: ' + err.message);
+        console.error(err);
+      }
     }
 
+    // ===== arrows on route using turf =====
+    function clearArrows() {
+      arrowsLayer.clearLayers();
+    }
+
+    /**
+     * Add arrow markers along GeoJSON LineString at approx interval_m meters.
+     * lineGeoJSON: { type: "LineString", coordinates: [...] }
+     */
+    function addArrowsToRoute(lineGeoJSON, interval_m = 10) {
+      // clear existing arrows
+      arrowsLayer.clearLayers();
+      try {
+        const line = turf.lineString(lineGeoJSON.coordinates);
+        const length_km = turf.length(line, { units: 'kilometers' });
+        if (length_km <= 0) return;
+
+        const step_km = interval_m / 1000.0;
+        // start from step_km to avoid placing arrow exactly at origin if undesired
+        for (let dist = step_km; dist < length_km; dist += step_km) {
+          const pt = turf.along(line, dist, { units: 'kilometers' });
+
+          // compute bearing using a slightly-ahead point
+          const delta_km = Math.min(0.0005, step_km); // small advance
+          const aheadDist = Math.min(dist + delta_km, length_km);
+          const ptAhead = turf.along(line, aheadDist, { units: 'kilometers' });
+
+          let bearing = turf.bearing(pt, ptAhead);
+          if (isNaN(bearing)) bearing = 0;
+
+          // convert to lat/lng
+          const [lng, lat] = pt.geometry.coordinates;
+
+          // SVG arrow (points upward by default), rotate by bearing degrees
+          const size = 16; // px
+          const svg = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24">
+              <g transform="translate(12,12) rotate(${bearing}) translate(-12,-12)">
+                <path d="M12 2 L16 10 L12 8 L8 10 Z" fill="#0066cc" stroke="#003366" stroke-width="0.4"/>
+              </g>
+            </svg>
+          `;
+
+          const icon = L.divIcon({
+            html: svg,
+            className: 'route-arrow-icon',
+            iconSize: [size, size],
+            iconAnchor: [size/2, size/2]
+          });
+
+          const marker = L.marker([lat, lng], { icon: icon, interactive: false });
+          arrowsLayer.addLayer(marker);
+        }
+      } catch (e) {
+        console.error('addArrowsToRoute error', e);
+      }
+    }
+
+    // ===== Save / Load using slot (slot-0 .. slot-9) =====
     async function saveRoute() {
       syncPositionsFromMarkers();
       if (markerPositions.length === 0) { setStatus('保存するルートがありません。'); return; }
-      // サーバ側でも必ず検証してください（こちらはフロント側チェック）
       if (!markerPositions.every(p =>
         p.lat >= SHONANDAI_BBOX.minLat && p.lat <= SHONANDAI_BBOX.maxLat &&
         p.lng >= SHONANDAI_BBOX.minLng && p.lng <= SHONANDAI_BBOX.maxLng)) {
         setStatus('保存できません：ルートに湘南台外の点が含まれています。');
         return;
       }
-      const payload = { name: 'shonandai-route', points: markerPositions, created_at: new Date().toISOString() };
+      const slot = document.getElementById('route-slot').value;
+      const name = 'slot-' + slot;
+      const payload = { name: name, points: markerPositions, created_at: new Date().toISOString() };
       try {
         const res = await fetch('/save_route', {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
         });
         const j = await res.json();
-        if (res.ok) setStatus('ルートをサーバに保存しました。');
-        else setStatus('保存に失敗: ' + (j.error || res.statusText));
-      } catch (err) { setStatus('保存でエラー: ' + err.message); }
+        if (res.ok) {
+          setStatus('ルートを保存しました: ' + name);
+          await refreshSlotList();
+        } else {
+          setStatus('保存に失敗: ' + (j.error || res.statusText));
+        }
+      } catch (err) {
+        setStatus('保存でエラー: ' + err.message);
+      }
     }
 
     async function loadRoute() {
       try {
-        const res = await fetch('/load_route?name=shonandai-route');
+        const slot = document.getElementById('route-slot').value;
+        const name = 'slot-' + slot;
+        const res = await fetch('/load_route?name=' + encodeURIComponent(name));
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const j = await res.json();
         if (!j.points || j.points.length === 0) { setStatus('保存されたルートが見つかりません。'); return; }
+
+        // front validation
         if (!j.points.every(p =>
           p.lat >= SHONANDAI_BBOX.minLat && p.lat <= SHONANDAI_BBOX.maxLat &&
           p.lng >= SHONANDAI_BBOX.minLng && p.lng <= SHONANDAI_BBOX.maxLng)) {
           setStatus('読み込んだルートに湘南台外の点が含まれているため中止しました。');
           return;
         }
+
         clearMarkers();
         j.points.forEach(p => addMarker({ lat: p.lat, lng: p.lng }));
         updatePolyline();
+        // optionally draw OSRM route for those points
         drawRouting();
-        setStatus('ルートを読み込みました。');
-      } catch (err) { setStatus('読み込みでエラー: ' + err.message); }
+        setStatus('ルートを読み込みました: ' + name);
+      } catch (err) {
+        setStatus('読み込みでエラー: ' + err.message);
+      }
     }
 
-    // クリックで追加（範囲外は拒否）
-    map.on('click', e => addMarker(e.latlng));
+    // ===== Slot list UI =====
+    async function refreshSlotList() {
+      try {
+        const res = await fetch('/list_routes');
+        if (!res.ok) { console.error('list_routes failed', res.status); return; }
+        const data = await res.json();
+        slotListEl.innerHTML = '';
+        for (let i = 0; i < 10; i++) {
+          const key = 'slot-' + i;
+          const info = data[key];
+          const span = document.createElement('span');
+          span.className = 'slot-item ' + (info && info.exists ? 'saved' : 'empty');
+          const label = 'Slot ' + (i+1) + ' — ' + (info && info.exists ? info.created_at : '空');
+          span.textContent = label;
+          span.title = info && info.exists ? 'クリックで選択して読み込み' : '空のスロット';
+          span.addEventListener('click', () => {
+            document.getElementById('route-slot').value = String(i);
+          });
+          slotListEl.appendChild(span);
+        }
+      } catch (err) {
+        console.error('refreshSlotList error', err);
+      }
+    }
 
+    // ===== event wiring =====
+    map.on('click', (e) => addMarker(e.latlng));
     document.getElementById('btn-clear').addEventListener('click', clearMarkers);
     document.getElementById('btn-draw').addEventListener('click', drawRouting);
     document.getElementById('btn-save').addEventListener('click', saveRoute);
     document.getElementById('btn-load').addEventListener('click', loadRoute);
+    document.getElementById('btn-overwrite').addEventListener('click', function(){
+      if (confirm('選択中のスロットを上書きしてよいですか？')) saveRoute();
+    });
 
-    // 初期表示を湘南台にフィット
+    // initial
+    refreshSlotList();
     map.fitBounds(shonandaiBounds);
   </script>
 </body>
