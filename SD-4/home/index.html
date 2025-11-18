@@ -7,7 +7,10 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     body { margin:0; font-family: system-ui, "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif; }
-    #map { height: 70vh; width: 100%; }
+    #map {
+  height: calc(100vh - 60px); /* 60px は上のボタンの高さ */
+  width: 100%;
+}
     .controls { padding: 8px; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.08); z-index: 400; }
     button { margin-right: 6px; }
     #status { margin-left: 8px; color: #333; }
