@@ -1,0 +1,12 @@
+パスワードは平文で保存しない
+→ bcrypt, Argon2 などでハッシュ化して password_hash に保存
+
+login_id は UNIQUE 制約を付ける
+
+セキュリティ上、できれば created_at や updated_at を持つ
+| カラム名          | 型                       | 必須 | 説明            |
+| ------------- | ----------------------- | -- | ------------- |
+| id            | INT AUTO_INCREMENT (PK) | ✅  | ユーザー識別子       |
+| login_id      | VARCHAR(100) UNIQUE     | ✅  | ログイン用ID       |
+| password_hash | VARCHAR(255)            | ✅  | ハッシュ化されたパスワード |
+| created_at    | DATETIME                | ✅  | 登録日時          |

@@ -44,14 +44,14 @@
     <!-- ログインフォーム -->
     <div class="login-container">
       <h3 class="text-center mb-4">ログインフォーム</h3>
-      <form onsubmit="return validateLogin()">
+      <form action="login.php" method="POST">
         <div class="mb-3">
           <label for="username" class="form-label">ユーザー名</label>
-          <input type="text" class="form-control" id="username" required>
+          <input type="text" class="form-control" id="username" name="login_id" required >
         </div>
         <div class="mb-3">
           <label for="password" class="form-label">パスワード</label>
-          <input type="password" class="form-control" id="password" required>
+          <input type="password" class="form-control" name="password" id="password" required>
         </div>
         <button type="submit" class="btn btn-primary w-100">ログイン</button>
         <div id="error-msg" class="mt-3 text-danger text-center" style="display: none;">ユーザー名またはパスワードが違います</div>
