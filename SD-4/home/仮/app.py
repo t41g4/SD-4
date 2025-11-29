@@ -4,6 +4,7 @@ from route import create_route
 
 def create_app():
     app = Flask(__name__)
+    app.secret_key = "your_secret_key"
     init_db(app)
     create_route(app)
     return app
