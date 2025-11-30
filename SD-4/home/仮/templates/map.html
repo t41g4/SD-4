@@ -4,7 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>地図システム</title>
-
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet-extra-markers/1.2.1/css/leaflet.extra-markers.min.css">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 
@@ -56,8 +57,8 @@
   class="form-control search-bar" 
   placeholder="住所を検索（Enter）">
     <button id="modeToggleBtn" class="btn btn-primary mode-btn">
-    📍 ピン登録モード：OFF
-    </button>
+  🔵 通常モード
+  </button>
     <!--ここまでボタン類-->
     <!-- メニュー本体（Offcanvas） -->
     <div class="offcanvas offcanvas-start" tabindex="-1" id="menu">
@@ -124,7 +125,7 @@
               document.getElementById("logoutYes").addEventListener("click", function() {
                   window.location.href = "/logout";
               });
-            </script>
+             </script>
              <!-- ここまでログアウト用js -->
           </div>
     </div>
@@ -140,9 +141,11 @@
   <!-- Leaflet -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
+  <!--ExtraMarkers の CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-extra-markers/1.2.1/js/leaflet.extra-markers.min.js"></script>
+
   <!-- 外部JS -->
   <script src="{{ url_for('static', filename='js/map.js') }}"></script>
-
 </body>
 </html>
 

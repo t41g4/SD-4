@@ -1,3 +1,8 @@
+document.addEventListener("DOMContentLoaded", function() {
+    if (!L.ExtraMarkers) {
+        console.error("Leaflet ExtraMarkers がロードされていません");
+        return;
+    }
 // Leaflet 初期化
 const map = L.map('map', {
   zoomControl: false
@@ -33,7 +38,7 @@ if (navigator.geolocation) {
 }
 
 // 住所検索（Enter だけで発動）
-document.getElementById("addressInput").addEventListener("keydown", function(e) {
+document.getElementById("addressInput").addEventListener("keydown", function (e) {
   if (e.key === "Enter") {
     searchAddress();
   }
@@ -65,7 +70,6 @@ function searchAddress() {
 
       // 地図移動
       map.setView([lat, lon], 16);
-
     })
     .catch(() => {
       alert("住所検索中にエラーが発生しました。");
@@ -74,40 +78,82 @@ function searchAddress() {
 
 // OSRM ルート描画
 async function drawRoute(start, end) {
-  const url = `https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${end.lng},${end.lat}?overview=full&geometries=geojson`;
+  const url =
+    `https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${end.lng},${end.lat}?overview=full&geometries=geojson`;
 
   const res = await fetch(url);
   const data = await res.json();
-
   const route = data.routes[0].geometry;
 
   L.geoJSON(route, {
-    style: { color: 'blue', weight: 4 }
+    style: {
+      color: 'blue',
+      weight: 4
+    }
   }).addTo(map);
 }
 
 // ======== ピン登録モード ========
-let isRegisterMode = false;
+let mode = "normal";  // "normal" | "register" | "select"
+let selectedMarkers = [];
 const modeBtn = document.getElementById("modeToggleBtn");
 
-modeBtn.addEventListener("click", () => {
-  isRegisterMode = !isRegisterMode;
-
-  if (isRegisterMode) {
-    modeBtn.classList.replace("btn-primary", "btn-danger");
-    modeBtn.innerText = "📍 ピン登録モード：ON";
-  } else {
-    modeBtn.classList.replace("btn-danger", "btn-primary");
-    modeBtn.innerText = "📍 ピン登録モード：OFF";
+function updateModeButton() {
+  if (mode === "normal") {
+    modeBtn.classList.remove("btn-danger", "btn-warning");
+    modeBtn.classList.add("btn-primary");
+    modeBtn.innerText = "🔵 通常モード";
   }
+  else if (mode === "register") {
+    modeBtn.classList.remove("btn-primary", "btn-warning");
+    modeBtn.classList.add("btn-danger");
+    modeBtn.innerText = "📍 ピン登録モード：ON";
+  }
+  else if (mode === "select") {
+    modeBtn.classList.remove("btn-primary", "btn-danger");
+    modeBtn.classList.add("btn-warning");
+    modeBtn.innerText = "🟡 選択モード";
+  }
+}
+
+modeBtn.addEventListener("click", () => {
+  if (mode === "normal") {
+    mode = "register";
+  } else if (mode === "register") {
+    mode = "select";
+  } else {
+    mode = "normal";  // select → normal に戻る
+  }
+  updateModeButton();
 });
 
+// 初期表示
+updateModeButton();
+//選択モードアイコン
+// 通常（青）
+const normalIcon = L.ExtraMarkers.icon({
+  icon: "fa-number",
+  number: "",
+  markerColor: "blue",
+  shape: "circle",
+  prefix: "fa"
+});
+
+// 選択中（赤）
+const selectedIcon = L.ExtraMarkers.icon({
+  icon: "fa-check",
+  markerColor: "red",
+  shape: "circle",
+  prefix: "fa"
+});
 // ========== マーカー追加 ==========
 function addMarker(lat, lng, data = { name: "", datetime: "", photo: "" }) {
-  const marker = L.marker([lat, lng]).addTo(map);
+  const marker = L.marker([lat, lng], { icon: normalIcon }).addTo(map);
   marker.data = data;
 
-  marker.on("click", () => openPanel(marker));
+   marker.isSelected = false;
+
+  marker.on("click", () => handleMarkerClick(marker));
 
   return marker;
 }
@@ -116,7 +162,6 @@ function addMarker(lat, lng, data = { name: "", datetime: "", photo: "" }) {
 const panel = new bootstrap.Offcanvas('#markerDetailPanel');
 
 function openPanel(marker) {
-
   // マーカー情報をフォームにセット
   document.getElementById('markerName').value = marker.data.name || "";
   document.getElementById('markerDate').value = marker.data.datetime || "";
@@ -126,22 +171,29 @@ function openPanel(marker) {
   const saveBtn = document.querySelector("#markerDetailPanel button[type='submit']");
   const deleteBtn = document.getElementById("deleteBtn");
 
-  // ===== モードに応じた入力可否切替 =====
-  if (isRegisterMode) {
-    inputs.forEach(i => i.disabled = false);
-    saveBtn.style.display = "block";//保存ボタン表示
-    deleteBtn.style.display = "block";//削除ボタン表示
-  } else {
-    inputs.forEach(i => i.disabled = true);
-    saveBtn.style.display = "none";//保存ボタン非表示
-    deleteBtn.style.display = "none";//削除ボタン非表示
-  }
+// ===== モードに応じた入力制御 =====
+if (mode === "normal") {
+  inputs.forEach(i => i.disabled = true);
+  saveBtn.style.display = "none";
+  deleteBtn.style.display = "none";
+}
+
+else if (mode === "register") {
+  inputs.forEach(i => i.disabled = false);
+  saveBtn.style.display = "block";
+  deleteBtn.style.display = "block";  // ← 登録モードだけ削除ボタンも表示
+}
+
+else if (mode === "select") {
+  inputs.forEach(i => i.disabled = true);
+  saveBtn.style.display = "none";
+  deleteBtn.style.display = "none";  // ← 非表示に変更
+}
 
   // 保存処理
   const form = document.getElementById("markerForm");
   form.onsubmit = (e) => {
     e.preventDefault();
-
     marker.data.name = document.getElementById('markerName').value;
     marker.data.datetime = document.getElementById('markerDate').value;
 
@@ -150,25 +202,42 @@ function openPanel(marker) {
   };
 
   panel.show();
+
   // 削除処理
   deleteBtn.onclick = () => {
     map.removeLayer(marker);
     panel.hide();
   };
-};
+}
 
-// ========== 地図クリックでピン追加 ==========
 map.on("click", (e) => {
-  if (!isRegisterMode) return;
+  if (mode !== "register") return;   // 登録モード以外はピンを置かない
 
   const { lat, lng } = e.latlng;
 
   // マーカー追加
   const marker = addMarker(lat, lng);
 
-  // 追加したマーカーを即編集
+  // 追加したマーカーをすぐ編集
   openPanel(marker);
 });
 
+// マーカー選択切替関数
+function handleMarkerClick(marker) {
+  if (mode === "select") {  // 選択モード
+    marker.isSelected = !marker.isSelected;
+    if (marker.isSelected) {
+      marker.setIcon(selectedIcon);
+      selectedMarkers.push(marker); // 配列に追加
+    } else {
+      marker.setIcon(normalIcon);
+      const idx = selectedMarkers.indexOf(marker);
+      if (idx !== -1) selectedMarkers.splice(idx, 1);
+    }
+    return; // パネルは開かない
+  }
+    // 登録モードならパネルを開く
+  if (mode === "register") openPanel(marker);
+}
 
-
+});

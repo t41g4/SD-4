@@ -10,3 +10,34 @@ login_id は UNIQUE 制約を付ける
 | login_id      | VARCHAR(100) UNIQUE     | ✅  | ログイン用ID       |
 | password_hash | VARCHAR(255)            | ✅  | ハッシュ化されたパスワード |
 | created_at    | DATETIME                | ✅  | 登録日時          |
+
+CREATE TABLE markers (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  name VARCHAR(255),
+  latitude DOUBLE NOT NULL,
+  longitude DOUBLE NOT NULL,
+  datetime DATETIME,
+  photo_path VARCHAR(255),
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+class Marker(db.Model):
+    __tablename__ = "markers"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+
+    name = db.Column(db.String(255), nullable=True)  # SQLのnameと一致
+    latitude = db.Column(db.Float, nullable=False)
+    longitude = db.Column(db.Float, nullable=False)
+
+    datetime = db.Column(db.DateTime, nullable=True)  # SQLのdatetime
+    photo_path = db.Column(db.String(255), nullable=True)
+
+    created_at = db.Column(
+        db.DateTime,
+        nullable=False,
+        default=datetime.utcnow
+    )
