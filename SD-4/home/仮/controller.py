@@ -9,7 +9,7 @@ import openpyxl
 def top():
     if "user_id" not in session:
             return redirect("/login")
-    return render_template("index.html")
+    return render_template("map.html")
 
 def j_users():
     users = User.query.all()
