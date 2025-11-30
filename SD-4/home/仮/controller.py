@@ -1,6 +1,6 @@
 from flask import render_template, jsonify, request, redirect, session
 from sqlalchemy import func
-from model import db, User
+from model import db, User, Marker
 from datetime import datetime
 from werkzeug.security import check_password_hash, generate_password_hash
 import os
@@ -73,3 +73,40 @@ def register():
         return redirect("/login")
 
     return render_template("register.html")
+
+def save_marker():
+    data = request.json
+    marker = Marker(
+        user_id=session["user_id"],  # セッションから取得も可
+        name=data.get("name", ""),
+        latitude=data["lat"],
+        longitude=data["lng"],
+        taken_at=datetime.fromisoformat(data.get("taken_at")) if data.get("taken_at") else None,
+        photo_path=data.get("photo_path", "")
+    )
+    db.session.add(marker)
+    db.session.commit()
+    return jsonify({"id": marker.id})
+
+def get_markers():
+    markers = Marker.query.all()
+    result = [
+        {
+            "id": m.id,
+            "name": m.name,
+            "lat": m.latitude,
+            "lng": m.longitude,
+            "taken_at": m.taken_at.isoformat() if m.taken_at else "",
+            "photo_path": m.photo_path
+        } for m in markers
+    ]
+    return jsonify(result)
+
+def delete_marker(marker_id):
+    marker = Marker.query.get(marker_id)
+    if not marker:
+        return jsonify({"error": "not found"}), 404
+
+    db.session.delete(marker)
+    db.session.commit()
+    return jsonify({"message": "deleted"})

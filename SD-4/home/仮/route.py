@@ -29,3 +29,12 @@ def create_route(app):
     @app.route("/register", methods=["GET", "POST"])
     def register():
         return controller.register()
+    @app.route("/api/markers", methods=["POST"])
+    def save_marker():
+        return controller.save_marker()
+    @app.route("/api/markers", methods=["GET"])
+    def get_markers():
+        return controller.get_markers()
+    @app.route("/api/markers/<int:marker_id>", methods=["DELETE"])
+    def api_delete_marker(marker_id):
+        return controller.delete_marker(marker_id)

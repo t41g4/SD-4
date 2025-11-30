@@ -144,6 +144,12 @@
   <!--ExtraMarkers の CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-extra-markers/1.2.1/js/leaflet.extra-markers.min.js"></script>
 
+  <script>
+  // Flask の session からユーザーIDを取得（整数として扱う）
+  const CURRENT_USER_ID = {{ session['user_id'] | tojson }};
+  console.log("CURRENT_USER_ID:", CURRENT_USER_ID);
+</script>
+
   <!-- 外部JS -->
   <script src="{{ url_for('static', filename='js/map.js') }}"></script>
 </body>

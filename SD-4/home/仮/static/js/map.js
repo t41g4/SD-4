@@ -1,8 +1,3 @@
-document.addEventListener("DOMContentLoaded", function() {
-    if (!L.ExtraMarkers) {
-        console.error("Leaflet ExtraMarkers がロードされていません");
-        return;
-    }
 // Leaflet 初期化
 const map = L.map('map', {
   zoomControl: false
@@ -151,7 +146,7 @@ function addMarker(lat, lng, data = { name: "", datetime: "", photo: "" }) {
   const marker = L.marker([lat, lng], { icon: normalIcon }).addTo(map);
   marker.data = data;
 
-   marker.isSelected = false;
+  marker.isSelected = false;
 
   marker.on("click", () => handleMarkerClick(marker));
 
@@ -171,24 +166,24 @@ function openPanel(marker) {
   const saveBtn = document.querySelector("#markerDetailPanel button[type='submit']");
   const deleteBtn = document.getElementById("deleteBtn");
 
-// ===== モードに応じた入力制御 =====
-if (mode === "normal") {
-  inputs.forEach(i => i.disabled = true);
-  saveBtn.style.display = "none";
-  deleteBtn.style.display = "none";
-}
+  // ===== モードに応じた入力制御 =====
+  if (mode === "normal") {
+    inputs.forEach(i => i.disabled = true);
+    saveBtn.style.display = "none";
+    deleteBtn.style.display = "none";
+  }
 
-else if (mode === "register") {
-  inputs.forEach(i => i.disabled = false);
-  saveBtn.style.display = "block";
-  deleteBtn.style.display = "block";  // ← 登録モードだけ削除ボタンも表示
-}
+  else if (mode === "register") {
+    inputs.forEach(i => i.disabled = false);
+    saveBtn.style.display = "block";
+    deleteBtn.style.display = "block";  // ← 登録モードだけ削除ボタンも表示
+  }
 
-else if (mode === "select") {
-  inputs.forEach(i => i.disabled = true);
-  saveBtn.style.display = "none";
-  deleteBtn.style.display = "none";  // ← 非表示に変更
-}
+  else if (mode === "select") {
+    inputs.forEach(i => i.disabled = true);
+    saveBtn.style.display = "none";
+    deleteBtn.style.display = "none";  // ← 非表示に変更
+  }
 
   // 保存処理
   const form = document.getElementById("markerForm");
@@ -197,18 +192,52 @@ else if (mode === "select") {
     marker.data.name = document.getElementById('markerName').value;
     marker.data.datetime = document.getElementById('markerDate').value;
 
-    console.log("保存:", marker.data);
+    fetch("/api/markers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        lat: marker.getLatLng().lat,
+        lng: marker.getLatLng().lng,
+        name: marker.data.name,
+        taken_at: marker.data.taken_at,
+        photo_path: ""
+      })
+    })
+      .then(res => res.json())
+      .then(resData => {
+        marker.dbId = resData.id;   // ← DBのID
+        console.log("DB保存完了 | ID:", resData.id);
+      });
+      
     panel.hide();
   };
-
-  panel.show();
-
   // 削除処理
   deleteBtn.onclick = () => {
+
+  if (marker.dbId) {
+    // DB削除
+    fetch(`/api/markers/${marker.dbId}`, {
+      method: "DELETE"
+    })
+      .then(res => res.json())
+      .then(result => {
+        console.log("削除完了:", result);
+
+        map.removeLayer(marker);  // ← 地図から削除
+        panel.hide();             // ← パネル閉じる
+      })
+      .catch(err => {
+        console.error("削除失敗:", err);
+      });
+
+  } else {
+    // DB未登録のピン
     map.removeLayer(marker);
     panel.hide();
-  };
-}
+  }
+};
+  panel.show();
+};
 
 map.on("click", (e) => {
   if (mode !== "register") return;   // 登録モード以外はピンを置かない
@@ -236,8 +265,20 @@ function handleMarkerClick(marker) {
     }
     return; // パネルは開かない
   }
-    // 登録モードならパネルを開く
+  // 登録モードならパネルを開く
   if (mode === "register") openPanel(marker);
 }
-
-});
+// ▼ DB からマーカー読込
+fetch("/api/markers")
+  .then(res => res.json())
+  .then(data => {
+    data.forEach(m => {
+      const markerObj = addMarker(m.lat, m.lng, {
+        name: m.name,
+        datetime: m.datetime,
+        photo: m.photo_path
+      });
+      markerObj.dbId = m.id;
+    });
+  })
+  .catch(err => console.error("マーカー読み込みエラー:", err));
