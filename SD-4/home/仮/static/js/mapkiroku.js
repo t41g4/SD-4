@@ -98,23 +98,17 @@ let highlightTimeout = null;
 // モード切替ボタン
 function updateModeButton() {
     const modeBtn = document.getElementById("modeToggleBtn");
-    const routeBtn = document.getElementById("routeGenerationBtn"); // ルート生成ボタン
-
     if (!modeBtn) return console.error("モードボタンが見つかりません");
 
-    // モードごとのボタン表示
     if (mode === "normal") {
         modeBtn.className = "btn btn-primary mode-btn";
         modeBtn.innerText = "🔵 通常モード";
-        if (routeBtn) routeBtn.style.display = "inline-block"; // 表示
     } else if (mode === "register") {
         modeBtn.className = "btn btn-danger mode-btn";
         modeBtn.innerText = "📍 ピン登録モード：ON";
-        if (routeBtn) routeBtn.style.display = "none"; // 非表示
     } else if (mode === "select") {
         modeBtn.className = "btn btn-warning mode-btn";
         modeBtn.innerText = "🟡 選択モード";
-        if (routeBtn) routeBtn.style.display = "none"; // 非表示
     }
 }
 
@@ -240,51 +234,24 @@ function openPanel(marker) {
 }
 
 // =========================
-// マップクリック時処理（スタート→ゴール自動モード、ループ）
+// マップクリック時処理
 // =========================
-let selectingGoal = false; // trueならクリックでゴール設定モード
 map.on("click", (e) => {
-    const latlng = e.latlng;
+    if (mode === "normal") {
+        routeStart = e.latlng;
+        alert(`スタート地点を設定しました（${routeStart.lat.toFixed(5)}, ${routeStart.lng.toFixed(5)}）`);
+        return;
+    }
 
-    // 登録モード：マーカー追加
     if (mode === "register") {
-        const marker = addMarker(latlng.lat, latlng.lng);
+        const { lat, lng } = e.latlng;
+        const marker = addMarker(lat, lng);
         openPanel(marker);
         return;
     }
 
-    // 通常モード：スタート→ゴール設定
-    if (mode === "normal") {
-        if (!routeStart || (!routeGoal && !selectingGoal)) {
-            // スタート未設定 または ゴール未設定だがゴール設定モードではない
-            setStartMarker(latlng);
-            setStatus("スタート地点を設定しました");
-            selectingGoal = true; // 次のクリックはゴール設定
-            return;
-        }
-
-        if (selectingGoal) {
-            // ゴール設定モード
-            setGoalMarker(latlng);
-            setStatus("ゴール地点を設定しました");
-            selectingGoal = false; // ゴール設定完了
-            return;
-        }
-
-        // 両方設定済み → スタートに置き換え、ゴール設定モードへ
-        setStartMarker(latlng);
-        if (goalMarker) {
-            map.removeLayer(goalMarker);
-            goalMarker = null;
-            routeGoal = null;
-        }
-        setStatus("スタート地点を再設定しました。次にゴールを設定してください");
-        selectingGoal = true;
-    }
-
     // 選択モード/その他は何もしない
 });
-
 
 // =========================
 // マーカー選択切替関数
@@ -328,28 +295,21 @@ async function fetchRouteByCoords(coordsStr) {
     return await res.json();
 }
 
-// =========================
-// ルート描画メイン関数（スタート＋選択マーカー＋ゴール）
-// =========================
-async function drawRouting(selectedMarkers) {
-    if (!routeStart || !routeGoal) {
-        alert("スタートとゴールを設定してください");
+// ルート描画メイン関数
+async function drawRouting(markers) {
+    if (markers.length < 2) {
+        setStatus('編集ピンを2つ以上置いてください');
         return;
     }
 
-    if (selectedMarkers.length === 0) {
-        alert("ルートに含めるマーカーを選択してください");
-        return;
-    }
-
-    // スタート + 選択マーカー + ゴールの座標列
-    const waypoints = [routeStart, ...selectedMarkers.map(m => m.getLatLng()), routeGoal];
-    const coordsStr = waypoints.map(p => `${p.lng},${p.lat}`).join(';');
+    const coords = markers.map(m => {
+        const p = m.getLatLng();
+        return p.lng + ',' + p.lat;
+    }).join(';');
 
     try {
         setStatus('ルート取得中...');
-        const data = await fetchRouteByCoords(coordsStr);
-
+        const data = await fetchRouteByCoords(coords);
         if (!data.routes || data.routes.length === 0) {
             setStatus('ルートが見つかりません');
             return;
@@ -357,31 +317,21 @@ async function drawRouting(selectedMarkers) {
 
         const route = data.routes[0];
 
-        // 既存のルートがあれば削除
         if (polyline) {
             map.removeLayer(polyline);
             polyline = null;
         }
+
         clearArrows();
-
-        // 新ルート描画
-        polyline = L.geoJSON(route.geometry, {
-            style: { color: '#2b8cff', weight: 6, opacity: 0.9 }
-        }).addTo(map);
-
-        // 地図範囲調整
+        polyline = L.geoJSON(route.geometry, { style: { color: '#2b8cff', weight: 6, opacity: 0.9 } }).addTo(map);
         map.fitBounds(polyline.getBounds().pad(0.1));
-
-        // 矢印描画
         addArrowsToRoute(route.geometry, 10);
-
-        // ルート案内表示
         showDirections(route);
-
         setStatus('ルート描画完了');
+
     } catch (e) {
-        console.error(e);
         setStatus('OSRMエラー: ' + e.message);
+        console.error(e);
     }
 }
 
@@ -508,7 +458,11 @@ function showDirections(route) {
 // =========================
 document.getElementById("routeGenerationBtn").addEventListener("click", () => {
     const selected = allMarkers.filter(m => m.isSelected);
-    drawRouting(selected); // 選択マーカー0個でも可
+    if (selected.length < 2) {
+        alert("ルートを作成するには、2つ以上のマーカーを選択してください。");
+        return;
+    }
+    drawRouting(selected);
 });
 
 // =========================
@@ -529,81 +483,3 @@ function setStatus(msg) {
         setTimeout(() => { el.style.display = "none"; }, 500);
     }, 3000);
 }
-
-// =========================
-// スタート/ゴールマーカー管理
-// =========================
-let startMarker = null;
-let goalMarker = null;
-let routeStart = null;
-let routeGoal = null;
-
-// アイコン
-const startIcon = L.ExtraMarkers.icon({ icon: "fa-play", markerColor: "yellow", shape: "circle", prefix: "fa" });
-const endIcon   = L.ExtraMarkers.icon({ icon: "fa-flag-checkered", markerColor: "yellow", shape: "circle", prefix: "fa" });
-
-// マーカー設置関数
-function setStartMarker(latlng) {
-    if (startMarker) map.removeLayer(startMarker);
-    startMarker = L.marker(latlng, { icon: startIcon }).addTo(map);
-    routeStart = latlng;
-}
-
-function setGoalMarker(latlng) {
-    if (goalMarker) map.removeLayer(goalMarker);
-    goalMarker = L.marker(latlng, { icon: endIcon }).addTo(map);
-    routeGoal = latlng;
-}
-
-// =========================
-// 現在地ボタンからスタート設定
-// =========================
-document.getElementById("currentLocationStartBtn").addEventListener("click", () => {
-    if (!navigator.geolocation) return alert("このブラウザでは位置情報が利用できません");
-
-    navigator.geolocation.getCurrentPosition(
-        (pos) => {
-            const latlng = L.latLng(pos.coords.latitude, pos.coords.longitude);
-            setStartMarker(latlng);
-            map.setView(latlng, 15);
-        },
-        (err) => console.error("位置情報取得失敗:", err)
-    );
-});
-
-// =========================
-// マーカーパネルのボタンからスタート/ゴール設定
-// =========================
-let currentPanelMarker = null; // パネルで表示中のマーカー
-
-function openPanel(marker) {
-    currentPanelMarker = marker; // 今開いているマーカーを保持
-
-    document.getElementById('markerName').value = marker.data.name || "";
-    document.getElementById('markerDate').value = marker.data.datetime || "";
-    document.getElementById('markerPhoto').value = "";
-
-    const inputs = document.querySelectorAll("#markerDetailPanel input");
-    const saveBtn = document.querySelector("#markerDetailPanel button[type='submit']");
-    const deleteBtn = document.getElementById("deleteBtn");
-
-    if (mode === "normal" || mode === "select") {
-        inputs.forEach(i => i.disabled = true);
-        saveBtn.style.display = "none";
-        deleteBtn.style.display = "none";
-    } else if (mode === "register") {
-        inputs.forEach(i => i.disabled = false);
-        saveBtn.style.display = "block";
-        deleteBtn.style.display = "block";
-    }
-
-    // スタート・ゴールボタン
-    const setStartBtn = document.getElementById("setStartBtn");
-    const setGoalBtn  = document.getElementById("setGoalBtn");
-
-    setStartBtn.onclick = () => { if(currentPanelMarker) setStartMarker(currentPanelMarker.getLatLng()); };
-    setGoalBtn.onclick  = () => { if(currentPanelMarker) setGoalMarker(currentPanelMarker.getLatLng()); };
-
-    panel.show();
-}
-
