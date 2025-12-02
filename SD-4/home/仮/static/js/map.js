@@ -242,7 +242,7 @@ function openPanel(marker) {
 // =========================
 // マップクリック時処理（スタート→ゴール自動モード、ループ）
 // =========================
-let selectingGoal = false; // trueならクリックでゴール設定モード
+
 map.on("click", (e) => {
     const latlng = e.latlng;
 
@@ -570,40 +570,7 @@ document.getElementById("currentLocationStartBtn").addEventListener("click", () 
         (err) => console.error("位置情報取得失敗:", err)
     );
 });
-
 // =========================
 // マーカーパネルのボタンからスタート/ゴール設定
 // =========================
 let currentPanelMarker = null; // パネルで表示中のマーカー
-
-function openPanel(marker) {
-    currentPanelMarker = marker; // 今開いているマーカーを保持
-
-    document.getElementById('markerName').value = marker.data.name || "";
-    document.getElementById('markerDate').value = marker.data.datetime || "";
-    document.getElementById('markerPhoto').value = "";
-
-    const inputs = document.querySelectorAll("#markerDetailPanel input");
-    const saveBtn = document.querySelector("#markerDetailPanel button[type='submit']");
-    const deleteBtn = document.getElementById("deleteBtn");
-
-    if (mode === "normal" || mode === "select") {
-        inputs.forEach(i => i.disabled = true);
-        saveBtn.style.display = "none";
-        deleteBtn.style.display = "none";
-    } else if (mode === "register") {
-        inputs.forEach(i => i.disabled = false);
-        saveBtn.style.display = "block";
-        deleteBtn.style.display = "block";
-    }
-
-    // スタート・ゴールボタン
-    const setStartBtn = document.getElementById("setStartBtn");
-    const setGoalBtn  = document.getElementById("setGoalBtn");
-
-    setStartBtn.onclick = () => { if(currentPanelMarker) setStartMarker(currentPanelMarker.getLatLng()); };
-    setGoalBtn.onclick  = () => { if(currentPanelMarker) setGoalMarker(currentPanelMarker.getLatLng()); };
-
-    panel.show();
-}
-
