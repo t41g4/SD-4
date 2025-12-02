@@ -171,7 +171,13 @@ function addMarker(lat, lng, data = { name: "", datetime: "", photo: "" }) {
 // =========================
 // マーカー詳細パネル
 // =========================
+
+let currentPanelMarker = null; // パネルで表示中のマーカー
+
 function openPanel(marker) {
+
+    currentPanelMarker = marker;
+
     document.getElementById('markerName').value = marker.data.name || "";
     document.getElementById('markerDate').value = marker.data.datetime || "";
     document.getElementById('markerPhoto').value = "";
@@ -238,6 +244,8 @@ function openPanel(marker) {
 
     panel.show();
 }
+
+let selectingGoal = false;
 
 // =========================
 // マップクリック時処理（スタート→ゴール自動モード、ループ）
@@ -573,4 +581,21 @@ document.getElementById("currentLocationStartBtn").addEventListener("click", () 
 // =========================
 // マーカーパネルのボタンからスタート/ゴール設定
 // =========================
-let currentPanelMarker = null; // パネルで表示中のマーカー
+
+// パネルの「スタート地点に設定」ボタン
+document.getElementById("setStartBtn").addEventListener("click", () => {
+    if (!currentPanelMarker) return;
+    const latlng = currentPanelMarker.getLatLng();
+    setStartMarker(latlng);
+    panel.hide();
+    setStatus("スタート地点を設定しました");
+});
+
+// パネルの「ゴール地点に設定」ボタン
+document.getElementById("setGoalBtn").addEventListener("click", () => {
+    if (!currentPanelMarker) return;
+    const latlng = currentPanelMarker.getLatLng();
+    setGoalMarker(latlng);
+    panel.hide();
+    setStatus("ゴール地点を設定しました");
+});
