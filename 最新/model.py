@@ -79,3 +79,41 @@ class Restock(db.Model):
 
     quantity = db.Column(db.Integer, nullable=False)
     restocked_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+class Route(db.Model):
+    __tablename__ = "routes"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(255), nullable=False)
+
+    start_lat = db.Column(db.Float, nullable=False)
+    start_lng = db.Column(db.Float, nullable=False)
+    goal_lat = db.Column(db.Float, nullable=False)
+    goal_lng = db.Column(db.Float, nullable=False)
+
+    mode = db.Column(db.String(50), nullable=False)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # 子テーブル
+    markers = db.relationship(
+        "RouteMarker",
+        backref="route",
+        cascade="all, delete",
+        order_by="RouteMarker.order_num"
+    )
+
+
+class RouteMarker(db.Model):
+    __tablename__ = "route_markers"
+
+    id = db.Column(db.Integer, primary_key=True)
+    route_id = db.Column(db.Integer, db.ForeignKey("routes.id"), nullable=False)
+
+    # markers.id への参照（null許可：未保存マーカー対応）
+    marker_id = db.Column(db.Integer, nullable=True)
+
+    lat = db.Column(db.Float, nullable=False)
+    lng = db.Column(db.Float, nullable=False)
+
+    order_num = db.Column(db.Integer, nullable=False)
