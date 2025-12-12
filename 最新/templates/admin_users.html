@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>ユーザー管理ページ（管理者専用）</title>
+</head>
+<body>
+    <h1>ユーザー一覧（管理者：kanrisya）</h1>
+
+    <table border="1">
+        <tr>
+            <th>ID</th>
+            <th>ログインID</th>
+            <th>作成日</th>
+            <th>削除</th>
+        </tr>
+
+        {% for u in users %}
+        <tr>
+            <td>{{ u.id }}</td>
+            <td>{{ u.login_id }}</td>
+            <td>{{ u.created_at }}</td>
+            <td>
+                <form action="/admin/users/delete/{{ u.id }}" method="POST">
+                    <button type="submit">削除</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+</body>
+</html>

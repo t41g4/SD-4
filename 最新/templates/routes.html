@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>ルート一覧ページ</title>
+    <style>
+        body { font-family: sans-serif; margin: 30px; }
+        h1 { margin-bottom: 20px; }
+        ul { line-height: 2.0; }
+        a { color: #1a73e8; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .admin { color: red; }
+    </style>
+</head>
+<body>
+
+<h1>📌 ルート一覧ページ</h1>
+
+<ul>
+    <li><a href="/">/  （トップページ）</a></li>
+    <li><a href="/json?data=user">/json?data=user  （ユーザーJSON）</a></li>
+    <li><a href="/login">/login  （ログイン）</a></li>
+    <li><a href="/logout">/logout  （ログアウト）</a></li>
+    <li><a href="/mypage">/mypage  （マイページ）</a></li>
+    <li><a href="/register">/register  （ユーザー登録）</a></li>
+    <li><a href="/api/markers">/api/markers (GET)  （マーカー取得）</a></li>
+    <li>/api/markers (POST)  → フォーム以外では叩けません</li>
+    <li><a href="/Generalpublicmap.html">/Generalpublicmap.html  （一般向け地図）</a></li>
+
+    <hr>
+
+    <li class="admin"><a href="/admin/users">/admin/users  （管理者：ユーザー一覧）</a></li>
+    <li class="admin">/admin/users/delete/&lt;id&gt;  （管理者：ユーザー削除 POST）</li>
+
+</ul>
+
+</body>
+</html>

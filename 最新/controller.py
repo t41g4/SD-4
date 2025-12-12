@@ -14,6 +14,16 @@ def is_admin():
     return session.get("user_id") == 0 and session.get("login_id") == "kanrisya"
 # -ここまで-
 
+# ------------------------------
+# 改良場所：管理者判定関数
+# ------------------------------
+def is_admin():
+    return session.get("user_id") == 0 and session.get("login_id") == "kanrisya"
+# ------------------------------
+# -ここまで-
+# ------------------------------
+
+
 def top():
     if "user_id" not in session:
             return redirect("/login")
