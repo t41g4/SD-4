@@ -119,8 +119,9 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // マーカーパネル Offcanvas 初期化
-    window.panel = new bootstrap.Offcanvas(document.getElementById('markerDetailPanel'));
-
+    window.regPanel = new bootstrap.Offcanvas(document.getElementById('markerDetailPanel')); // 登録用
+    window.viewPanel = new bootstrap.Offcanvas(document.getElementById('markerViewPanel'));   // 閲覧用
+    window.restockModal = new bootstrap.Modal(document.getElementById('restockModal')); // 在庫補充モーダル
     // 初回モードボタン表示
     updateModeButton();
 });
@@ -154,93 +155,181 @@ function addMarker(lat, lng, data = { name: "", datetime: "", photo: "" }) {// d
     return marker;
 }
 
-// マーカー詳細パネル
+// ■ パネルを開く関数
 function openPanel(marker) {
-    document.getElementById('markerName').value = marker.data.name || ""; // マーカー名
-    document.getElementById('markerDate').value = marker.data.datetime || ""; //撮影日時
-    document.getElementById('markerPhoto').value = ""; //写真パス（未使用）
+    // 【重要】現在操作中のマーカーをグローバル変数にセット（在庫補充などで使うため）
+    currentPanelMarker = marker;
 
-    const inputs = document.querySelectorAll("#markerDetailPanel input"); // 入力欄群
-    const saveBtn = document.querySelector("#markerDetailPanel button[type='submit']"); // 保存ボタン
-    const deleteBtn = document.getElementById("deleteBtn"); // 削除ボタン
-    const setStartBtn = document.getElementById("setStartBtn"); // スタート設定ボタン
-    const setGoalBtn = document.getElementById("setGoalBtn"); // ゴール設定ボタン
-    // モードに応じた入力制御 
-    if (mode === "normal" || mode === "select") {
-        inputs.forEach(i => i.disabled = true);
-        saveBtn.style.display = "none"; // 非表示
-        deleteBtn.style.display = "none";
-        setStartBtn.style.display = "inline-block"; //表示
-        setGoalBtn.style.display = "inline-block";
-    } else if (mode === "register") {
-        inputs.forEach(i => i.disabled = false);
-        saveBtn.style.display = "block";
-        deleteBtn.style.display = "block";
-        setStartBtn.style.display = "none";
-        setGoalBtn.style.display = "none";
+    // 日付整形（共通処理）
+    // dateStr という変数に格納して、後で使い回せるようにします
+    let dateObj;
+    if (marker.data.datetime) {
+        dateObj = new Date(marker.data.datetime);
+    } else {
+        dateObj = new Date();
     }
 
-    // 保存処理
-    const form = document.getElementById("markerForm");
-    form.onsubmit = (e) => { // フォーム送信時
-        e.preventDefault(); //ページ遷移を防止（SPA処理の基本）
-        marker.data.name = document.getElementById('markerName').value; // マーカー名取得
-        marker.data.datetime = document.getElementById('markerDate').value; // 撮影日時取得
+    const year = dateObj.getFullYear();
+    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const day = String(dateObj.getDate()).padStart(2, '0');
+    const dateStr = `${year}/${month}/${day}`; // ★ここで変数 dateStr を定義
 
-        // DB保存処理
-        fetch("/api/markers", {
-            method: "POST", // POSTメソッドで送信
-            headers: { "Content-Type": "application/json" }, // JSON形式で送信
-            body: JSON.stringify({
-                lat: marker.getLatLng().lat, // 緯度
-                lng: marker.getLatLng().lng, // 経度
-                name: marker.data.name, // マーカー名
-                taken_at: marker.data.datetime, // 撮影日時
-                photo_path: "" // 写真パス（未使用）
-            })
-        })
-            .then(res => res.json()) // レスポンスをJSONに変換
-            .then(resData => {
-                marker.dbId = resData.id; // DBから返されたIDをマーカーに保存
-                console.log("DB保存完了 | ID:", resData.id);
-            });
+    // ==========================================
+    // モードによる分岐
+    // ==========================================
 
-        panel.hide();
-    };
+    if (mode === "register") {
+        // --------------------------------------
+        // 登録モード：既存の markerDetailPanel (登録用) を使用
+        // --------------------------------------
+        document.getElementById('markerName').value = marker.data.name || "";
+        document.getElementById('markerDate').value = dateStr; // 定義した dateStr を使用
+        document.getElementById('markerPhoto').value = "";
 
-    // 削除処理
-    deleteBtn.onclick = () => {
-        if (mode !== "register") return; // 登録モード以外では削除禁止
-        if (marker.dbId) { // DBに保存されている場合は削除API呼び出し
-            fetch(`/api/markers/${marker.dbId}`, { method: "DELETE" }) // DELETEメソッドで送信
-                .then(res => res.json())
-                .then(() => { //地図&配列から削除
-                    map.removeLayer(marker);
-                    allMarkers = allMarkers.filter(m => m !== marker);
-                    panel.hide();
-                });
-        } else { //DB未保存の場合は単純に削除
-            map.removeLayer(marker);
-            allMarkers = allMarkers.filter(m => m !== marker);
-            panel.hide();
+        // ■ 追加: 編集モード判定（一時IDでなければ編集）
+        const isEdit = marker.dbId && !String(marker.dbId).startsWith("tmp_");
+        // ■ 追加: ボタンのテキスト切り替え
+        const saveBtn = document.getElementById("regSaveBtn"); // HTMLでIDを追加しておくこと
+        if (saveBtn) saveBtn.innerText = isEdit ? "更新" : "保存";
+
+        // ■ 追加: 写真プレビュー表示
+        const regImgEl = document.getElementById('regMarkerPhotoPreview');
+        const regNoPhotoEl = document.getElementById('regNoPhotoText');
+
+        if (regImgEl && regNoPhotoEl) {
+            if (marker.data.photo) {
+                regImgEl.src = marker.data.photo;
+                regImgEl.style.display = "block";
+                regNoPhotoEl.style.display = "none";
+            } else {
+                regImgEl.style.display = "none";
+                regNoPhotoEl.style.display = "block";
+            }
         }
-    };
+        // ■ 追加: 削除ボタンの表示制御
+        const deleteBtn = document.getElementById("deleteBtn");
 
-    // スタート設定ボタン
+        // 保存処理
+        const form = document.getElementById("markerForm");
+        form.onsubmit = (e) => {
+            e.preventDefault();
+            marker.data.name = document.getElementById('markerName').value;
+            // 日付はサーバー側で自動設定
 
-    setStartBtn.onclick = () => {
-        setStartMarker(marker.getLatLng());
-        panel.hide();
-    };
-    //ゴール設定ボタン
-    setGoalBtn.onclick = () => {
-        setGoalMarker(marker.getLatLng());
-        panel.hide();
-    };
+            const formData = new FormData();
+            // ■ 追加: 編集時はIDを送信する
+            if (isEdit) {
+                formData.append("id", marker.dbId);
+            }
 
-    currentPanelMarker = marker; // 現在のパネルマーカーを更新
+            formData.append("latitude", marker.getLatLng().lat);
+            formData.append("longitude", marker.getLatLng().lng);
+            formData.append("name", marker.data.name);
 
-    panel.show();
+            const fileInput = document.getElementById('markerPhoto');
+            if (fileInput.files[0]) {
+                formData.append("photo", fileInput.files[0]);
+            }
+
+            fetch("/api/markers", { method: "POST", body: formData })
+                .then(res => {
+                    if (!res.ok) throw new Error("保存失敗");
+                    return res.json();
+                })
+                .then(resData => {
+                    marker.dbId = resData.id;
+                    marker.data.datetime = new Date().toISOString();
+                    // 写真パスが返ってきたら更新
+                    if (resData.photo_path) marker.data.photo = resData.photo_path;
+
+                    alert(isEdit ? "更新しました" : "登録しました");
+                    if (window.regPanel) window.regPanel.hide();
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert("保存エラー");
+                });
+        };
+
+        // 削除処理
+        deleteBtn.onclick = () => {
+            if (!confirm("削除しますか？")) return;
+            // DB保存済みならAPIを叩く
+            if (marker.dbId && String(marker.dbId).indexOf('tmp_') === -1) {
+                fetch(`/api/markers/${marker.dbId}`, { method: "DELETE" })
+                    .then(res => res.json())
+                    .then(() => {
+                        map.removeLayer(marker);
+                        allMarkers = allMarkers.filter(m => m !== marker);
+                        if (window.regPanel) window.regPanel.hide();
+                    });
+            } else {
+                // 未保存なら地図から消すだけ
+                map.removeLayer(marker);
+                allMarkers = allMarkers.filter(m => m !== marker);
+                if (window.regPanel) window.regPanel.hide();
+            }
+        };
+
+        if (window.regPanel) window.regPanel.show();
+
+    } else {
+        // --------------------------------------
+        // 通常/選択モード：新しい markerViewPanel (閲覧用) を使用
+        // --------------------------------------
+
+        // 表示データのセット (IDに view がついていることに注意)
+        document.getElementById('viewMarkerName').value = marker.data.name || "名称未設定";
+        document.getElementById('viewMarkerDate').value = dateStr;
+
+        // 写真表示
+        const imgEl = document.getElementById('viewMarkerPhoto');
+        const noPhotoEl = document.getElementById('noPhotoText');
+        if (marker.data.photo) {
+            imgEl.src = marker.data.photo;
+            imgEl.style.display = "block";
+            noPhotoEl.style.display = "none";
+        } else {
+            imgEl.style.display = "none";
+            noPhotoEl.style.display = "block";
+        }
+
+        // スタート/ゴールボタンの設定
+        const setStartBtn = document.getElementById("setStartBtn");
+        const setGoalBtn = document.getElementById("setGoalBtn");
+
+        if (setStartBtn) {
+            setStartBtn.onclick = () => {
+                setStartMarker(marker.getLatLng());
+                if (window.viewPanel) window.viewPanel.hide();
+                setStatus("スタート地点を設定しました");
+            };
+        }
+
+        if (setGoalBtn) {
+            setGoalBtn.onclick = () => {
+                setGoalMarker(marker.getLatLng());
+                if (window.viewPanel) window.viewPanel.hide();
+                setStatus("ゴール地点を設定しました");
+            };
+        }
+        // 在庫補充ボタンの設定
+        const openRestockBtn = document.getElementById("openRestockModalBtn");
+        if (openRestockBtn) {
+            openRestockBtn.onclick = () => {
+                openRestockModal(marker);
+            };
+        }
+
+        // 在庫補充UIのリセット
+        if (document.getElementById("productSearch")) document.getElementById("productSearch").value = "";
+        if (document.getElementById("searchResults")) document.getElementById("searchResults").style.display = "none";
+        if (document.getElementById("numPadDisplay")) document.getElementById("numPadDisplay").value = "";
+        selectedProductId = null;
+        currentQuantity = "";
+
+        if (window.viewPanel) window.viewPanel.show();
+    }
 }
 
 // マップクリック時処理（スタート→ゴール自動モード、ループ）
@@ -313,10 +402,19 @@ function handleMarkerClick(marker) {
 // DB からマーカー読込
 
 fetch("/api/markers") //サーバーにアクセス
-    .then(res => res.json())// レスポンスをJSONに変換
+    .then(res => res.json())
     .then(data => {
-        data.forEach(m => { //一件ずつ追加
-            const marker = addMarker(m.lat, m.lng, { name: m.name, datetime: m.taken_at, photo: m.photo_path });
+        data.forEach(m => {
+            // サーバーからのレスポンスが { latitude: 35.xxx, longitude: 139.xxx, ... } の場合
+            // addMarkerの引数は (lat, lng, data) なので、ここでマッピングする
+            const lat = m.latitude !== undefined ? m.latitude : m.lat;   // 両方対応できるようにチェック
+            const lng = m.longitude !== undefined ? m.longitude : m.lng;
+
+            const marker = addMarker(lat, lng, {
+                name: m.name,
+                datetime: m.taken_at,
+                photo: m.photo_path
+            });
             marker.dbId = m.id;
         });
     })
@@ -528,7 +626,7 @@ document.addEventListener("DOMContentLoaded", () => {
         // routingMode が "manual" なら選択順ルート生成
         if (routingMode === "manual") {
             drawRouting(selectedMarkers); // 選択順ルート
-        } 
+        }
         // 最短ルート
         else if (routingMode === "optimized") {
             drawOptimizedRoute(selectedMarkers); // 最短ルート
@@ -561,9 +659,22 @@ let goalMarker = null;
 let routeStart = null;
 let routeGoal = null;
 
-// アイコン
-const startIcon = L.ExtraMarkers.icon({ icon: "fa-play", markerColor: "yellow", shape: "circle", prefix: "fa" });
-const endIcon = L.ExtraMarkers.icon({ icon: "fa-flag-checkered", markerColor: "yellow", shape: "circle", prefix: "fa" });
+// アイコン (S: Start, G: Goal)
+const startIcon = L.ExtraMarkers.icon({
+    icon: "fa-number",    // 文字モード
+    number: "S",          // Sを表示
+    markerColor: "yellow", // 色は黄色のまま
+    shape: "circle",
+    prefix: "fa"
+});
+
+const endIcon = L.ExtraMarkers.icon({
+    icon: "fa-number",    // 文字モード
+    number: "G",          // Gを表示
+    markerColor: "yellow", // 色は黄色のまま
+    shape: "circle",
+    prefix: "fa"
+});
 
 // マーカー設置関数
 function setStartMarker(latlng) {
@@ -600,18 +711,18 @@ let currentPanelMarker = null; // パネルで表示中のマーカー
 //ログアウト確認モーダル
 
 document.addEventListener("DOMContentLoaded", () => {
-  document.getElementById("logoutYes").addEventListener("click", () => {
-    window.location.href = "/logout";
-  });
+    document.getElementById("logoutYes").addEventListener("click", () => {
+        window.location.href = "/logout";
+    });
 });
 
 // ルート方式切替ボタン
 document.addEventListener("DOMContentLoaded", () => {
-  document.getElementById("routingModeToggleBtn").addEventListener("click", () => {
-      routingMode = routingMode === "manual" ? "optimized" : "manual";
-      document.getElementById("routingModeToggleBtn").textContent =
-          `ルート方式：${routingMode === "manual" ? "選択順" : "最短"}`;
-  });
+    document.getElementById("routingModeToggleBtn").addEventListener("click", () => {
+        routingMode = routingMode === "manual" ? "optimized" : "manual";
+        document.getElementById("routingModeToggleBtn").textContent =
+            `ルート方式：${routingMode === "manual" ? "選択順" : "最短"}`;
+    });
 });
 
 // 最短ルート生成関数（スタート・ゴール固定）
@@ -628,16 +739,25 @@ async function drawOptimizedRoute(selectedMarkers) {
     try {
         setStatus("最短ルート計算中...");
 
-        // スタート + 選択マーカー + ゴールの座標列
+        // スタート + 選択マーカー + ゴール のリスト
         const waypoints = [routeStart, ...selectedMarkers.map(m => m.getLatLng()), routeGoal];
+
+        // 座標文字列作成
         const coordsStr = waypoints.map(p => `${p.lng},${p.lat}`).join(";");
 
-        // /trip API にリクエスト
-        const url = `https://router.project-osrm.org/trip/v1/driving/${coordsStr}?source=first&destination=last&roundtrip=false&overview=full&geometries=geojson&steps=true`;
+        // ★追加：座標の数だけ "curb" をセミコロン区切りで並べる
+        // 例: 4地点なら "curb;curb;curb;curb"
+        // これにより「すべての地点で、道路の左側（歩道側）に停車する」よう強制
+        const approachesStr = waypoints.map(() => "curb").join(";");
+
+        // ★修正：URLに &approaches=${approachesStr} を追加
+        const url = `https://router.project-osrm.org/trip/v1/driving/${coordsStr}?source=first&destination=last&roundtrip=false&overview=full&geometries=geojson&steps=true&approaches=${approachesStr}`;
+
         const res = await fetch(url);
         if (!res.ok) throw new Error("HTTP " + res.status);
 
         const data = await res.json();
+        // （以下、変更なし）
         if (!data.trips || data.trips.length === 0) {
             setStatus("ルートが見つかりません");
             return;
@@ -645,28 +765,21 @@ async function drawOptimizedRoute(selectedMarkers) {
 
         const trip = data.trips[0];
 
-        // 既存ルート削除
         if (polyline) { map.removeLayer(polyline); polyline = null; }
         clearArrows();
 
-        // OSRM の最短ルートを描画
         polyline = L.geoJSON(trip.geometry, {
             style: { color: '#2b8cff', weight: 6, opacity: 0.9 }
         }).addTo(map);
 
-        // 地図の表示範囲を調整
         map.fitBounds(polyline.getBounds().pad(0.1));
-
-        // 矢印描画
         addArrowsToRoute(trip.geometry, 10);
-
-        // ルート案内表示
         showDirections(trip);
 
         setStatus("最短ルート描画完了");
     } catch (e) {
         console.error(e);
-        setStatus("OSRM /trip エラー: " + e.message);
+        setStatus("OSRMエラー: " + e.message);
     }
 }
 // 選択マーカーリスト更新
@@ -728,91 +841,418 @@ function deselectMarker(idx) {
     selectedMarkers.splice(idx, 1);
     updateSelectedMarkersPanel();
 }
-// 仮のペットボトル飲料データ（全10件）
-const products = [
-  {
-    name: "アクアウォーター",
-    img: "https://via.placeholder.com/40?text=AQ"
-  },
-  {
-    name: "アクアウォーター ライト",
-    img: "https://via.placeholder.com/40?text=AQL"
-  },
-  {
-    name: "アクアウォーター スパークリング",
-    img: "https://via.placeholder.com/40?text=AQS"
-  },
-  {
-    name: "アクアウォーター レモン",
-    img: "https://via.placeholder.com/40?text=AQLm"
-  },
-  {
-    name: "アクアウォーター マイルド",
-    img: "https://via.placeholder.com/40?text=AQM"
-  },
 
-  { name: "ポカリスエット 500ml", img: "https://via.placeholder.com/40" },
-  { name: "ポカリスエット イオンウォーター 500ml", img: "https://via.placeholder.com/40" },
+// 在庫補充機能のためのグローバル変数と定数
 
-  { name: "コカ・コーラ 500ml", img: "https://via.placeholder.com/40" },
-  { name: "コカ・コーラ ゼロ 500ml", img: "https://via.placeholder.com/40" },
+let allProducts = [];         // サーバーまたは仮データから取得
+let selectedProductId = null; // 選択された商品ID
+let currentQuantity = "";     // 数量
+let currentUserId = window.CURRENT_USER_ID;        // ★仮ユーザー（DBに存在する user_id に合わせる）
+// demoユーザーなら 6 に変更してOK
 
-  { name: "いろはす 天然水 555ml", img: "https://via.placeholder.com/40" },
-  { name: "いろはす 白桃 555ml", img: "https://via.placeholder.com/40" },
+let searchInput;
+let searchResults;
+let numPadDisplay;
 
-  { name: "綾鷹 緑茶 525ml", img: "https://via.placeholder.com/40" }
-];
+// サーバーから商品データを取得する関数
+async function loadProducts() {
+    try {
+        const res = await fetch("/api/products");
+        const data = await res.json();
+        allProducts = data.map(p => ({
+            id: p.id,
+            name: p.name,
+            img: p.image_url
+        }));
 
-// DOM
-const searchInput = document.getElementById("productSearch");
-const searchResults = document.getElementById("searchResults");
+        console.log("商品ロード済:", allProducts);
+    } catch (e) {
+        console.error("商品読み込み失敗:", e);
+    }
+}
 
-// 入力で候補を表示
-searchInput.addEventListener("input", () => {
-  const keyword = searchInput.value.trim();
-  searchResults.innerHTML = "";
+// アプリ起動時に商品データを読み込む
+document.addEventListener("DOMContentLoaded", async () => {
+    searchInput = document.getElementById("productSearch");
+    searchResults = document.getElementById("searchResults");
+    numPadDisplay = document.getElementById("numPadDisplay");
 
-  if (keyword === "") {
-    searchResults.style.display = "none";
-    return;
-  }
+    await loadProducts();
 
-  const filtered = products.filter(p => p.name.includes(keyword));
+    setupProductSearch();
+    setupNumberPad();
+    setupRestockButton();
+});
 
-  if (filtered.length === 0) {
-    searchResults.style.display = "none";
-    return;
-  }
+// 商品検索機能セットアップ
+function setupProductSearch() {
+    if (!searchInput) return;
 
-  filtered.forEach(p => {
-    const item = document.createElement("button");
-    item.classList.add(
-      "list-group-item",
-      "list-group-item-action",
-      "d-flex",
-      "align-items-center",
-      "gap-2"
-    );
+    searchInput.addEventListener("input", () => {
+        const keyword = searchInput.value.trim();
+        searchResults.innerHTML = "";
+        selectedProductId = null;
 
-    item.innerHTML = `
-      <img src="${p.img}" width="40" height="40" class="rounded">
-      <span>${p.name}</span>
-    `;
+        if (keyword === "") {
+            searchResults.style.display = "none";
+            return;
+        }
 
-    item.addEventListener("click", () => {
-      searchInput.value = p.name;
-      searchResults.style.display = "none";
+        const filtered = allProducts.filter(p => p.name.toLowerCase().includes(keyword.toLowerCase()));
+
+        if (filtered.length === 0) {
+            searchResults.style.display = "none";
+            return;
+        }
+
+        filtered.forEach(p => {
+            const item = document.createElement("button");
+            item.classList.add(
+                "list-group-item",
+                "list-group-item-action",
+                "d-flex",
+                "align-items-center",
+                "gap-2"
+            );
+
+            item.innerHTML = `
+                <img src="${p.img}" width="40" height="40" class="rounded">
+                <span>${p.name}</span>
+            `;
+
+            item.addEventListener("click", () => {
+                searchInput.value = p.name;
+                selectedProductId = p.id;
+                searchResults.style.display = "none";
+
+                // 追加: 選択した商品を明示
+                document.getElementById("selectedProductDisplay").innerHTML =
+                    `選択中: <img src="${p.img}" width="20"> ${p.name}`;
+
+                currentQuantity = "";
+                numPadDisplay.value = "";
+            });
+
+            searchResults.appendChild(item);
+        });
+
+        searchResults.style.display = "block";
     });
 
-    searchResults.appendChild(item);
-  });
+    // 外側クリックで閉じる
+    document.addEventListener("click", (e) => {
+        if (!searchInput.contains(e.target)) {
+            searchResults.style.display = "none";
+        }
+    });
+}
 
-  searchResults.style.display = "block";
+// ルート保存処理
+document.getElementById("saveRouteBtn").addEventListener("click", () => {
+    if (!routeStart || !routeGoal || selectedMarkers.length === 0) {
+        return alert("スタート・ゴール・マーカーが必要です");
+    }
+
+    const modal = new bootstrap.Modal(document.getElementById("routeNameModal"));
+    modal.show();
 });
 
-// 商品以外の場所クリックで閉じる
-document.addEventListener("click", (e) => {
-  if (!searchInput.contains(e.target)) {
-    searchResults.style.display = "none";
-  }
+// ルート名保存ボタン
+document.getElementById("routeNameSaveBtn").addEventListener("click", async () => {
+    const name = document.getElementById("routeNameInput").value.trim() || "無題ルート";
+
+    const routeData = {
+        name,
+        start: routeStart,
+        goal: routeGoal,
+        markers: selectedMarkers.map((m, idx) => ({
+            id: m.dbId,
+            lat: m.getLatLng().lat,
+            lng: m.getLatLng().lng,
+            order: idx + 1
+        })),
+        mode: routingMode
+    };
+
+    try {
+        const res = await fetch("/api/routes", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(routeData)
+        });
+        const data = await res.json();
+        alert("ルート保存完了: ID=" + data.id);
+        bootstrap.Modal.getInstance(document.getElementById("routeNameModal")).hide();
+    } catch (e) {
+        console.error(e);
+        alert("ルート保存失敗");
+    }
 });
+
+document.getElementById("loadRouteBtn").addEventListener("click", async () => {
+    const modal = new bootstrap.Modal(document.getElementById("routeListModal"));
+    modal.show();
+
+    try {
+        const res = await fetch("/api/routes");
+        const list = await res.json();
+
+        const ul = document.getElementById("routeList");
+        ul.innerHTML = "";
+
+        list.forEach(route => {
+            const li = document.createElement("li");
+            li.className = "list-group-item list-group-item-action";
+            li.textContent = `${route.name}（${route.mode}）`;
+
+            li.addEventListener("click", () => {
+                loadRoute(route.id);
+                modal.hide();
+            });
+
+            ul.appendChild(li);
+        });
+
+    } catch (e) {
+        console.error(e);
+        alert("ルート一覧の取得に失敗");
+    }
+});
+// ルート読込関数（修正版）
+async function loadRoute(routeId) {
+    try {
+        const res = await fetch(`/api/routes/${routeId}`);
+        const data = await res.json();
+
+        if (data.error) {
+            alert("ルートが見つかりません");
+            return;
+        }
+
+        // 1. 既存ルート表示のリセット
+        if (polyline) { map.removeLayer(polyline); polyline = null; }
+        clearArrows();
+
+        // 選択状態を一度すべてリセット（アイコンを青に戻す）
+        selectedMarkers.forEach(m => {
+            m.isSelected = false;
+            m.setIcon(normalIcon);
+        });
+        selectedMarkers = []; // 配列を空にする
+
+        // 2. スタート・ゴール設定
+        // DBのカラム名が start_lat/start_lng なのか、lat/lng なのかAPIのレスポンスによりますが、
+        // JS側で受け取ったオブジェクト構造に合わせて設定してください。
+        // ここでは data.start.lat / data.start.lng がある前提です。
+        if (data.start) setStartMarker(L.latLng(data.start.lat, data.start.lng));
+        if (data.goal) setGoalMarker(L.latLng(data.goal.lat, data.goal.lng));
+
+        routingMode = data.mode; // 保存されたルート方式を復元
+        if (document.getElementById("routingModeToggleBtn")) {
+            document.getElementById("routingModeToggleBtn").textContent =
+                `ルート方式：${routingMode === "manual" ? "選択順" : "最短"}`;
+        }
+
+        // 3. マーカー復元（ここが修正ポイント：既存マーカーを探して再利用）
+        if (data.markers && data.markers.length > 0) {
+            data.markers
+                .sort((a, b) => a.order - b.order) // 保存された順序（order_num）でソート
+                .forEach((m) => {
+                    // allMarkersの中から、IDが一致するものを探す
+                    // ※型不一致(String vs Number)を防ぐため String() で比較
+                    const existingMarker = allMarkers.find(am => String(am.dbId) === String(m.marker_id));
+
+                    if (existingMarker) {
+                        // 既存マーカーが見つかった場合
+                        existingMarker.isSelected = true; // 選択フラグをON
+                        selectedMarkers.push(existingMarker); // 選択リストに追加
+                    } else {
+                        // 万が一見つからない場合（ロード後に削除された等）
+                        console.warn(`マーカーID ${m.marker_id} は現在の地図上に存在しません。`);
+                    }
+                });
+        }
+
+        // 4. パネルと地図の描画更新
+        updateSelectedMarkersPanel(); // ここでアイコンが赤色(番号付き)に変わります
+
+        // ルート再描画
+        if (selectedMarkers.length > 0 && routeStart && routeGoal) {
+            if (routingMode === "manual") {
+                drawRouting(selectedMarkers);
+            } else {
+                drawOptimizedRoute(selectedMarkers);
+            }
+        }
+
+    } catch (e) {
+        console.error(e);
+        alert("ルート読込失敗: " + e.message);
+    }
+}
+
+// ----------------------------------------------------
+// キーパッドロジックの追加
+// ----------------------------------------------------
+function setupNumberPad() {
+    const keypad = document.querySelector("#numPadWrapper"); // wrapper をHTML側に作成しておく
+
+    if (!keypad) return;
+
+    keypad.addEventListener("click", (e) => {
+        const btn = e.target.closest("button");
+        if (!btn) return;
+
+        const value = btn.textContent.trim();
+
+        if (/^[0-9]$/.test(value)) {
+            if (currentQuantity === "0" && value === "0") return;
+            currentQuantity += value;
+        } else if (value === "C") {
+            currentQuantity = "";
+        }
+        numPadDisplay.value = currentQuantity || "0";
+    });
+}
+// 在庫補充データ保存
+// ---------------------------------------------
+async function saveRestockData() {
+    
+    if (!currentPanelMarker || !currentPanelMarker.dbId) return alert("マーカーエラー");
+    if (!selectedProductId) return alert("商品を選択してください");
+    const quantity = parseInt(currentQuantity);
+    if (isNaN(quantity) || quantity <= 0) return alert("数量を入力してください");
+
+    const payload = {
+        user_id: currentUserId,
+        marker_id: currentPanelMarker.dbId,
+        product_id: selectedProductId,
+        quantity: quantity
+    };
+
+    try {
+        const res = await fetch("/api/restocks", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) throw new Error("サーバーエラー");
+        // 入力クリア
+        currentQuantity = "";
+        numPadDisplay.value = "";
+        // 商品選択は残す？クリアする？ → 今回は残します（同じ商品を連続補充するケースもあるため）
+        
+        // 履歴を再読み込み
+        loadMarkerRestockHistory(currentPanelMarker.dbId);
+    } catch (e) {
+        console.error("補充エラー:", e);
+        alert("補充保存に失敗しました");
+    }
+}
+
+// ---------------------------------------------
+// 在庫補充ボタン
+// ---------------------------------------------
+function setupRestockButton() {
+    const btn = document.getElementById("restockSubmitBtn"); // ★id を使うのが安全
+
+    if (!btn) return;
+
+    btn.addEventListener("click", () => {
+        saveRestockData();
+    });
+}
+
+// ■ 新しい関数: 在庫補充モーダルを開く
+function openRestockModal(marker) {
+    // タイトル設定
+    document.getElementById("restockModalTitle").textContent = `在庫補充: ${marker.data.name || "名称未設定"}`;
+
+    // 入力リセット
+    document.getElementById("productSearch").value = "";
+    document.getElementById("searchResults").style.display = "none";
+    document.getElementById("numPadDisplay").value = "";
+    document.getElementById("selectedProductDisplay").textContent = "";
+    selectedProductId = null;
+    currentQuantity = "";
+
+    // 履歴読み込み
+    loadMarkerRestockHistory(marker.dbId);
+
+    // 詳細パネルを閉じてモーダルを開く
+    if (window.viewPanel) window.viewPanel.hide();
+    window.restockModal.show();
+}
+
+// map.js の末尾に追加・上書き
+
+// ■ 特定マーカーの履歴を読み込む（5列版：担当＋削除）
+async function loadMarkerRestockHistory(markerId) {
+    const tbody = document.getElementById("restockHistoryTableBody");
+    // 列数に合わせて colspan="5" に変更
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center">読み込み中...</td></tr>';
+
+    try {
+        const res = await fetch("/api/restocks");
+        if (!res.ok) throw new Error("履歴取得失敗");
+        
+        const allData = await res.json();
+        const markerData = allData.filter(d => String(d.marker_id) === String(markerId));
+        
+        tbody.innerHTML = "";
+        
+        if (markerData.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">履歴はありません</td></tr>';
+            return;
+        }
+
+        markerData.forEach(item => {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+                <td class="d-flex align-items-center gap-2">
+                    <img src="${item.image_url || ''}" width="30" height="30" class="rounded">
+                    <span class="text-truncate" style="max-width: 120px;">${item.product_name}</span>
+                </td>
+                <td class="align-middle fw-bold">${item.quantity}</td>
+                <td class="align-middle small">${item.date}</td>
+                <td class="align-middle small">${item.user_name || '-'}</td>
+                
+                <td class="align-middle text-center">
+                    <button class="btn btn-danger btn-sm px-2" onclick="deleteRestock(${item.id})">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+    } catch (e) {
+        console.error(e);
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">エラーが発生しました</td></tr>';
+    }
+}
+
+// ■ 新しい関数: モーダル内からの削除処理
+async function deleteRestock(restockId) {
+    if (!confirm("この履歴を削除しますか？")) return;
+
+    try {
+        const res = await fetch(`/api/restocks/${restockId}`, {
+            method: "DELETE"
+        });
+
+        if (res.ok) {
+            // 削除成功したら、現在のマーカーの履歴を再読み込みして表示を更新
+            // currentPanelMarker は openPanel でセットされているグローバル変数
+            if (currentPanelMarker) {
+                loadMarkerRestockHistory(currentPanelMarker.dbId);
+            }
+        } else {
+            alert("削除に失敗しました");
+        }
+    } catch (e) {
+        console.error("削除エラー:", e);
+        alert("サーバーエラーが発生しました");
+    }
+}

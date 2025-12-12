@@ -5,7 +5,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>地図システム</title>
-
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <link rel="stylesheet"
     href="https://cdnjs.cloudflare.com/ajax/libs/leaflet-extra-markers/1.2.1/css/leaflet.extra-markers.min.css">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -66,6 +66,24 @@
       /* 画面右からの距離 */
       z-index: 1000;
     }
+
+    /* ルート保存ボタン（現在地スタートボタンの直上に配置） */
+    #saveRouteBtn {
+      position: absolute;
+      right: 20px;
+
+      /* 現在地スタートボタンより少し上 */
+      top: 170px;
+      /* 必要に応じて ±5～10px 調整 */
+
+      z-index: 9999;
+
+      padding: 10px 16px;
+      font-size: 14px;
+      border-radius: 8px;
+      white-space: nowrap;
+    }
+
 
     .toggle-btn {
       bottom: 60px;
@@ -135,6 +153,7 @@
   <button id="currentLocationStartBtn" class="btn btn-primary currentLocationStartBtn">
     現在地をスタート地点にする
   </button>
+  <button id="saveRouteBtn" class="btn btn-success">ルート保存</button>
   <!--ここまでボタン類-->
   <!-- メニュー本体（Offcanvas） -->
   <div class="offcanvas offcanvas-start" tabindex="-1" id="menu">
@@ -145,8 +164,8 @@
     <div class="offcanvas-body">
       <p>ここに項目を追加できます。</p>
       <ul>
-        <li>現在地に移動</li>
-        <li>ルート検索</li>
+        <li><a href="{{ url_for('login') }}">ホーム</a></li>
+        <li><a href="{{url_for('post_view')}}">Excelに出力</a></li>
         <li>設定</li>
       </ul>
       <button class="btn btn-primary offcanvas-bottom-btn" data-bs-toggle="modal"
@@ -157,7 +176,7 @@
   <!-- マーカー詳細登録パネル -->
   <div class="offcanvas offcanvas-end" tabindex="-1" id="markerDetailPanel">
     <div class="offcanvas-header">
-      <h5 class="offcanvas-title">マーカー詳細登録</h5>
+      <h5 class="offcanvas-title">📍 マーカー登録</h5>
       <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
     </div>
     <div class="offcanvas-body">
@@ -167,63 +186,64 @@
           <input type="text" class="form-control" id="markerName" required>
         </div>
         <div class="mb-3">
-          <label for="markerDate" class="form-label">登録日時</label>
-          <input type="datetime-local" class="form-control" id="markerDate" required>
+          <label for="markerDate" class="form-label">登録日</label>
+          <input type="text" class="form-control" id="markerDate" readonly>
         </div>
         <div class="mb-3">
-          <label for="markerPhoto" class="form-label">写真</label>
+          <label class="form-label">登録済み写真</label>
+          <div class="text-center bg-light border rounded p-2"
+            style="min-height: 100px; display: flex; align-items: center; justify-content: center;">
+            <img id="regMarkerPhotoPreview" src="" class="img-fluid rounded" style="display:none; max-height: 200px;">
+            <span id="regNoPhotoText" class="text-secondary small">写真未登録</span>
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label for="markerPhoto" class="form-label">写真アップロード（変更する場合）</label>
           <input type="file" class="form-control" id="markerPhoto" accept="image/*">
         </div>
+
         <div class="d-flex gap-2">
-          <button type="submit" class="btn btn-primary">登録</button>
+          <button type="submit" class="btn btn-primary flex-grow-1" id="regSaveBtn">保存</button>
           <button type="button" id="deleteBtn" class="btn btn-danger">削除</button>
-          <button type="button" class="btn btn-success" id="setStartBtn">スタート地点に設定</button>
-          <button type="button" class="btn btn-success" id="setGoalBtn">ゴール地点に設定</button>
         </div>
-        <!-- 商品検索バー -->
-        <div class="mb-3 position-relative">
-          <label class="form-label">商品検索</label>
-          <input type="text" id="productSearch" class="form-control" placeholder="商品名で検索">
+      </form>
+    </div>
+  </div>
+  <div class="offcanvas offcanvas-end" tabindex="-1" id="markerViewPanel">
+    <div class="offcanvas-header">
+      <h5 class="offcanvas-title">詳細情報</h5>
+      <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+    </div>
+    <div class="offcanvas-body">
 
-          <!-- 候補一覧（浮かせて表示） -->
-          <div id="searchResults" class="list-group position-absolute w-100 shadow-sm bg-white"
-            style="z-index: 2000; display:none; max-height: 200px; overflow-y: auto;">
-          </div>
+      <div class="mb-3">
+        <label class="form-label text-muted small">マーカー名</label>
+        <input type="text" class="form-control" id="viewMarkerName" readonly>
+      </div>
+      <div class="mb-3">
+        <label class="form-label text-muted small">登録日</label>
+        <input type="text" class="form-control" id="viewMarkerDate" readonly>
+      </div>
+      <div class="mb-3">
+        <div class="text-center bg-light border rounded p-2"
+          style="min-height: 100px; display: flex; align-items: center; justify-content: center;">
+          <img id="viewMarkerPhoto" src="" class="img-fluid rounded" style="display:none; max-height: 200px;">
+          <span id="noPhotoText" class="text-secondary small" style="display:none;">写真なし</span>
         </div>
+      </div>
+      <div class="d-flex gap-2 mb-4">
+        <button type="button" class="btn btn-success flex-grow-1" id="setStartBtn">スタートに設定</button>
+        <button type="button" class="btn btn-warning flex-grow-1" id="setGoalBtn">ゴールに設定</button>
+      </div>
 
-        <!-- 数字キーパッド -->
-        <div class="mb-3">
-          <label class="form-label">数量入力キーパッド</label>
-          <div class="card">
-            <div class="card-body p-2">
-              <!-- 表示部分（動作なし） -->
-              <input type="text" class="form-control mb-2 text-end" id="numPadDisplay" placeholder="0" disabled>
+      <hr>
 
-              <!-- キーパッド -->
-              <div class="row g-1">
-                <div class="col-4"><button type="button" class="btn btn-secondary w-100">7</button></div>
-                <div class="col-4"><button type="button" class="btn btn-secondary w-100">8</button></div>
-                <div class="col-4"><button type="button" class="btn btn-secondary w-100">9</button></div>
+      <h6 class="mb-3"><i class="bi bi-box-seam"></i> 在庫管理</h6>
+      <button id="openRestockModalBtn" class="btn btn-primary w-100 py-3">
+        <i class="bi bi-plus-circle"></i> 在庫補充画面を開く
+      </button>
 
-                <div class="col-4"><button type="button" class="btn btn-secondary w-100">4</button></div>
-                <div class="col-4"><button type="button" class="btn btn-secondary w-100">5</button></div>
-                <div class="col-4"><button type="button" class="btn btn-secondary w-100">6</button></div>
-
-                <div class="col-4"><button type="button" class="btn btn-secondary w-100">1</button></div>
-                <div class="col-4"><button type="button" class="btn btn-secondary w-100">2</button></div>
-                <div class="col-4"><button type="button" class="btn btn-secondary w-100">3</button></div>
-
-                <div class="col-4"><button type="button" class="btn btn-secondary w-100">0</button></div>
-                <div class="col-4"><button type="button" class="btn btn-secondary w-100">.</button></div>
-                <div class="col-4"><button type="button" class="btn btn-danger w-100">C</button></div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div>
-          <button class="btn btn-primary w-100">決定</button>
-        </div>
-        </form>
     </div>
   </div>
   <!-- ここまでマーカー詳細登録パネル -->
@@ -280,7 +300,120 @@
       </ul>
     </div>
   </div>
+  <!-- ここまで選択マーカー順序パネル -->
+  <!-- ルート名入力モーダル -->
+  <div class="modal fade" id="routeNameModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">ルート名の入力</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="text" id="routeNameInput" class="form-control" placeholder="ルート名を入力">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+          <button type="button" id="routeNameSaveBtn" class="btn btn-primary">保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- ここまでルート名入力モーダル -->
+  <!-- ルート一覧モーダル -->
+  <div class="modal fade" id="routeListModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">保存済みルート一覧</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
 
+        <div class="modal-body">
+          <ul id="routeList" class="list-group">
+            <!-- JSで追加 -->
+          </ul>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ルート読込ボタン -->
+  <button id="loadRouteBtn" class="btn btn-warning" style="position:absolute; right:20px; top:260px; z-index:9999;">
+    ルート読込
+  </button>
+  <!-- 在庫補充モーダル -->
+  <div class="modal fade" id="restockModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+      <div class="modal-content" style="height: 80vh;">
+        <div class="modal-header bg-light">
+          <h5 class="modal-title" id="restockModalTitle">在庫補充</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-0">
+          <div class="row h-100 g-0">
+
+            <div class="col-md-5 p-4 border-end overflow-auto">
+              <h6 class="mb-3">① 商品を選択</h6>
+              <div class="mb-4 position-relative">
+                <input type="text" id="productSearch" class="form-control form-control-lg" placeholder="商品名で検索...">
+                <div id="searchResults" class="list-group position-absolute w-100 shadow-sm bg-white"
+                  style="z-index: 2000; display:none; max-height: 200px; overflow-y: auto;">
+                </div>
+                <div class="mt-2 text-primary fw-bold" id="selectedProductDisplay" style="min-height: 1.5em;"></div>
+              </div>
+
+              <h6 class="mb-3">② 数量を入力</h6>
+              <div class="card mb-4">
+                <div class="card-body p-2" id="numPadWrapper">
+                  <input type="text" class="form-control mb-2 text-end fs-4" id="numPadDisplay" placeholder="0"
+                    disabled>
+                  <div class="row g-1">
+                    <div class="col-4"><button type="button" class="btn btn-secondary w-100 py-3 fs-5">7</button></div>
+                    <div class="col-4"><button type="button" class="btn btn-secondary w-100 py-3 fs-5">8</button></div>
+                    <div class="col-4"><button type="button" class="btn btn-secondary w-100 py-3 fs-5">9</button></div>
+                    <div class="col-4"><button type="button" class="btn btn-secondary w-100 py-3 fs-5">4</button></div>
+                    <div class="col-4"><button type="button" class="btn btn-secondary w-100 py-3 fs-5">5</button></div>
+                    <div class="col-4"><button type="button" class="btn btn-secondary w-100 py-3 fs-5">6</button></div>
+                    <div class="col-4"><button type="button" class="btn btn-secondary w-100 py-3 fs-5">1</button></div>
+                    <div class="col-4"><button type="button" class="btn btn-secondary w-100 py-3 fs-5">2</button></div>
+                    <div class="col-4"><button type="button" class="btn btn-secondary w-100 py-3 fs-5">3</button></div>
+                    <div class="col-4"><button type="button" class="btn btn-secondary w-100 py-3 fs-5">0</button></div>
+                    <div class="col-4"><button type="button" class="btn btn-secondary w-100 py-3 fs-5"
+                        disabled>.</button></div>
+                    <div class="col-4"><button type="button" class="btn btn-danger w-100 py-3 fs-5">C</button></div>
+                  </div>
+                </div>
+              </div>
+
+              <button id="restockSubmitBtn" type="button" class="btn btn-primary w-100 btn-lg">決定・保存</button>
+            </div>
+
+            <div class="col-md-7 p-4 bg-light overflow-auto">
+              <h6 class="mb-3">この自販機の補充履歴</h6>
+              <table class="table table-bordered table-hover bg-white">
+                <thead class="table-light sticky-top">
+                  <tr>
+                    <th>商品</th>
+                    <th>数</th>
+                    <th>日時</th>
+                    <th>担当</th><th style="width: 60px;">削除</th>
+                  </tr>
+                </thead>
+                <tbody id="restockHistoryTableBody">
+                </tbody>
+              </table>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
   <!-- Bootstrap JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
