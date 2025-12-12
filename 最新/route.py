@@ -41,3 +41,26 @@ def create_route(app):
     @app.route("/Generalpublicmap.html")
     def general_public_map():
         return controller.general_public_map()
+
+    # -----------------------------------------
+    # 改良場所：管理者専用ページ（kanrisya.html）
+    # -----------------------------------------
+    @app.route("/kanrisya")
+    def kanrisya():
+        return controller.kanrisya_page()
+
+    @app.route("/admin/users")
+    def admin_users():
+        return controller.admin_users()
+
+
+    @app.route("/admin/users/delete/<int:user_id>", methods=["POST"])
+    def admin_delete_user(user_id):
+        return controller.admin_delete_user(user_id)
+
+    @app.route("/routes")
+    def route_list():
+        return render_template("routes.html")
+    # -----------------------------------------
+    # -ここまで-
+    # -----------------------------------------
