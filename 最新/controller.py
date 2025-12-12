@@ -169,7 +169,14 @@ def delete_marker(marker_id):
     marker = Marker.query.get(marker_id)
     if not marker:
         return jsonify({"error": "not found"}), 404
+    # 【セキュリティ修正】自分のマーカーか確認（または管理者）
+    if marker.user_id != session["user_id"] and not is_admin():
+         return jsonify({"error": "Forbidden"}), 403
 
+    # 【バグ修正】関連する補充履歴を先に削除（またはDB側でCascade設定）
+    Restock.query.filter_by(marker_id=marker.id).delete()
+    # 関連するルート情報もあれば削除が必要
+    RouteMarker.query.filter_by(marker_id=marker.id).delete()
     db.session.delete(marker)
     db.session.commit()
     return jsonify({"message": "deleted"})
