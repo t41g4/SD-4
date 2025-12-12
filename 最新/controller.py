@@ -6,6 +6,16 @@ from werkzeug.security import check_password_hash, generate_password_hash
 import os
 import openpyxl
 
+# ------------------------------
+# 改良場所：管理者判定関数
+# ------------------------------
+def is_admin():
+    return session.get("user_id") == 0 and session.get("login_id") == "kanrisya"
+# ------------------------------
+# -ここまで-
+# ------------------------------
+
+
 def top():
     if "user_id" not in session:
             return redirect("/login")
@@ -34,6 +44,15 @@ def login():
         if user and check_password_hash(user.password_hash, password):
             session["user_id"] = user.id
             session["login_id"] = user.login_id
+            # ------------------------------
+            # 改良場所：管理者なら専用ページへ
+            # ------------------------------
+            if user.id == 0 and user.login_id == "kanrisya":
+                return redirect("/kanrisya")
+            # ------------------------------
+            # -ここまで-
+            # ------------------------------
+
             return redirect("/")
         else:
             return render_template("login.html", error="ユーザー名またはパスワードが違います")
@@ -113,3 +132,45 @@ def delete_marker(marker_id):
 
 def general_public_map():
     return render_template("Generalpublicmap.html")
+
+# -----------------------------------------
+# 管理者専用ユーザー一覧ページ
+# -----------------------------------------
+def admin_users():
+    if not is_admin():
+        return "アクセス権がありません", 403
+
+    users = User.query.all()
+    return render_template("admin_users.html", users=users)
+
+
+def admin_delete_user(user_id):
+    if not is_admin():
+        return "アクセス権がありません", 403
+
+    if user_id == 0:
+        return "管理者自身を削除することはできません", 400
+
+    user = User.query.get(user_id)
+    if not user:
+        return "ユーザーが見つかりません", 404
+
+    Restock.query.filter_by(user_id=user_id).delete()
+    Marker.query.filter_by(user_id=user_id).delete()
+
+    db.session.delete(user)
+    db.session.commit()
+
+    return redirect("/admin/users")
+
+
+# -----------------------------------------
+# 改良場所：管理者専用ページ
+# -----------------------------------------
+def kanrisya_page():
+    if not is_admin():
+        return "アクセス権がありません", 403
+    return render_template("kanrisya.html")
+# -----------------------------------------
+# -ここまで-
+# -----------------------------------------
