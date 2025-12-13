@@ -31,6 +31,7 @@ async function loadRestockHistory() {
                 <td>${item.quantity}</td>
                 <td>${item.marker_name}</td>
                 <td>${item.date}</td>
+                <td>${item.user_name || '-'}</td>
                 <td class="text-center">
                     <button class="btn btn-danger btn-sm delete-btn" data-id="${item.id}">
                         <i class="bi bi-trash"></i> 削除
@@ -81,8 +82,27 @@ function setupExcelButton() {
     const btn = document.querySelector(".excel-btn");
     if (btn) {
         btn.addEventListener("click", () => {
-            // Excelダウンロード用のエンドポイントへ遷移
-            window.location.href = "/download/excel";
+            // 1. フォームの値を収集
+            const range = document.querySelector('input[name="dateRange"]:checked').value;
+            const target = document.getElementById("targetUser").value;
+            const product = document.getElementById("productFilter").value;
+
+            // 2. クエリパラメータを作成
+            const params = new URLSearchParams({
+                range: range,
+                target: target,
+                product: product
+            });
+
+            // 3. パラメータ付きでExcelダウンロードURLへ遷移
+            // 例: /download/excel?range=week&target=self&product=コーラ
+            window.location.href = `/download/excel?${params.toString()}`;
         });
     }
 }
+
+// (オプション) 「この条件で一覧を絞り込み」ボタンの実装
+document.getElementById("applyFilterBtn").addEventListener("click", () => {
+    // API経由で再取得する処理などをここに書きます（今回はExcel出力がメインなので割愛）
+    // loadRestockHistory() に引数を渡してAPIを叩き直すなどの実装になります
+});

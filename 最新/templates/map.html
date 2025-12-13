@@ -5,31 +5,37 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>地図システム</title>
+
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
   <link rel="stylesheet"
     href="https://cdnjs.cloudflare.com/ajax/libs/leaflet-extra-markers/1.2.1/css/leaflet.extra-markers.min.css">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+  
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="補充支援">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='uploads/icon-192.png') }}">
   <style>
     #map {
       height: 100vh;
       z-index: 1;
     }
 
+    /* ボタン類の配置 */
     .menu-btn {
       position: absolute;
       top: 15px;
       left: 15px;
       z-index: 1000;
-      /* 地図より前面に */
     }
 
     .mode-btn {
       position: absolute;
       top: 15px;
       right: 15px;
-      /* ← 左上から右上に変更 */
       z-index: 1000;
     }
 
@@ -37,8 +43,9 @@
       position: absolute;
       top: 15px;
       left: 70px;
-      /* ← ハンバーガーの右側に配置 */
       width: 250px;
+      /* スマホでは少し幅を狭める調整 */
+      max-width: 60%; 
       z-index: 1000;
       border-radius: 8px;
       padding-left: 10px;
@@ -47,9 +54,7 @@
     #menu .offcanvas-bottom-btn {
       position: absolute;
       bottom: 20px;
-      /* 下からの距離 */
       right: 20px;
-      /* 右からの距離 */
       z-index: 10;
     }
 
@@ -61,45 +66,32 @@
     .routeGeneration-btn {
       position: absolute;
       bottom: 15px;
-      /* 画面下からの距離 */
       right: 15px;
-      /* 画面右からの距離 */
       z-index: 1000;
     }
 
-    /* ルート保存ボタン（現在地スタートボタンの直上に配置） */
     #saveRouteBtn {
       position: absolute;
       right: 20px;
-
-      /* 現在地スタートボタンより少し上 */
       top: 170px;
-      /* 必要に応じて ±5～10px 調整 */
-
       z-index: 9999;
-
       padding: 10px 16px;
       font-size: 14px;
       border-radius: 8px;
       white-space: nowrap;
     }
 
-
     .toggle-btn {
       bottom: 60px;
-      /* ルート生成ボタンの上に15px間隔で配置 */
     }
 
     .currentLocationStartBtn {
       position: absolute;
       bottom: 105px;
-      /* 画面下からの距離 */
       right: 15px;
-      /* 画面右からの距離 */
       z-index: 1000;
     }
 
-    /* ルートステップのカスタムスタイル */
     .dir-step {
       padding: 8px;
       border-radius: 8px;
@@ -109,12 +101,9 @@
       cursor: pointer;
     }
 
-    /* Offcanvas パネル内を縦スクロール可能に */
     #directionsPanel .offcanvas-body {
       max-height: 80vh;
-      /* 画面高さの80%以内に制限 */
       overflow-y: auto;
-      /* 縦スクロールを有効に */
     }
 
     #routeStatus {
@@ -130,17 +119,43 @@
       z-index: 9999;
       transition: opacity 0.5s;
     }
+
+    /* --- スマホ最適化用 CSS --- */
+    
+    /* PC画面でのみ固定高さを適用 */
+    @media (min-width: 768px) {
+      .modal-desktop-fixed-height {
+        height: 80vh;
+      }
+      .desktop-h-100 {
+        height: 100% !important;
+      }
+    }
+
+    /* スマホ画面での調整 */
+    @media (max-width: 767.98px) {
+      /* モーダル内の列は高さをなりゆきに */
+      .mobile-h-auto {
+        height: auto !important;
+        overflow: visible !important; /* 親のスクロールに任せる */
+      }
+      /* 入力欄と履歴の間に境界線 */
+      .mobile-border-bottom {
+        border-bottom: 1px solid #dee2e6;
+        border-right: none !important;
+      }
+    }
   </style>
 </head>
 
 <body>
   <div id="map"></div>
-  <!--ボタン類-->
+  
   <button class="btn btn-dark menu-btn" data-bs-toggle="offcanvas" data-bs-target="#menu">
     ☰
   </button>
 
-  <input type="text" id="addressInput" class="form-control search-bar" placeholder="住所を検索（Enter）">
+  <input type="text" id="addressInput" class="form-control search-bar" placeholder="住所を検索">
   <button id="modeToggleBtn" class="btn btn-primary mode-btn">
     🔵 通常モード
   </button>
@@ -151,11 +166,9 @@
     ルート生成
   </button>
   <button id="currentLocationStartBtn" class="btn btn-primary currentLocationStartBtn">
-    現在地をスタート地点にする
+    現在地をSにする
   </button>
   <button id="saveRouteBtn" class="btn btn-success">ルート保存</button>
-  <!--ここまでボタン類-->
-  <!-- メニュー本体（Offcanvas） -->
   <div class="offcanvas offcanvas-start" tabindex="-1" id="menu">
     <div class="offcanvas-header">
       <h5 class="offcanvas-title">メニュー</h5>
@@ -172,8 +185,7 @@
         data-bs-target="#logoutModal">ログアウト</button>
     </div>
   </div>
-  <!-- ここまでメニュー本体（Offcanvas） -->
-  <!-- マーカー詳細登録パネル -->
+
   <div class="offcanvas offcanvas-end" tabindex="-1" id="markerDetailPanel">
     <div class="offcanvas-header">
       <h5 class="offcanvas-title">📍 マーカー登録</h5>
@@ -210,6 +222,7 @@
       </form>
     </div>
   </div>
+
   <div class="offcanvas offcanvas-end" tabindex="-1" id="markerViewPanel">
     <div class="offcanvas-header">
       <h5 class="offcanvas-title">詳細情報</h5>
@@ -246,19 +259,14 @@
 
     </div>
   </div>
-  <!-- ここまでマーカー詳細登録パネル -->
-  <!-- ログアウトモーダル本体 -->
+
   <div class="modal fade" id="logoutModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
         <div class="modal-header">
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
-
-        <h5 class="modal-body text-center">
-          ログアウトしますか？
-        </h5>
-
+        <h5 class="modal-body text-center">ログアウトしますか？</h5>
         <div class="modal-footer d-flex justify-content-center">
           <button type="button" class="btn btn-secondary me-2" data-bs-dismiss="modal">いいえ</button>
           <button id="logoutYes" class="btn btn-danger ms-2">はい</button>
@@ -266,20 +274,15 @@
       </div>
     </div>
   </div>
-  <!-- ここまでログアウトモーダル本体 -->
-  <!-- ルート情報パネル -->
+
   <div class="offcanvas offcanvas-end" tabindex="-1" id="directionsPanel">
     <div class="offcanvas-header">
       <h5 class="offcanvas-title">経路情報</h5>
       <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
     </div>
     <div class="offcanvas-body">
-      <div id="dir-summary" class="mb-3">
-        距離・時間などの概要がここに表示されます
-      </div>
-      <ul id="dir-steps" class="list-group">
-        <!-- 各ステップをクリックで地図上ハイライト -->
-      </ul>
+      <div id="dir-summary" class="mb-3"></div>
+      <ul id="dir-steps" class="list-group"></ul>
     </div>
   </div>
   <div id="routeStatus" style="position:absolute; top:70px; left:50%; transform:translateX(-50%);
@@ -288,20 +291,16 @@
     ルート情報
   </div>
 
-  <!-- 選択マーカー順序パネル -->
   <div class="offcanvas offcanvas-end" tabindex="-1" id="selectedMarkersPanel">
     <div class="offcanvas-header">
       <h5 class="offcanvas-title">選択マーカー順序</h5>
       <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
     </div>
     <div class="offcanvas-body p-0">
-      <ul class="list-group list-group-flush" id="selectedMarkersList">
-        <!-- 選択マーカーがここに追加される -->
-      </ul>
+      <ul class="list-group list-group-flush" id="selectedMarkersList"></ul>
     </div>
   </div>
-  <!-- ここまで選択マーカー順序パネル -->
-  <!-- ルート名入力モーダル -->
+
   <div class="modal fade" id="routeNameModal" tabindex="-1">
     <div class="modal-dialog">
       <div class="modal-content">
@@ -319,8 +318,7 @@
       </div>
     </div>
   </div>
-  <!-- ここまでルート名入力モーダル -->
-  <!-- ルート一覧モーダル -->
+
   <div class="modal fade" id="routeListModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-scrollable">
       <div class="modal-content">
@@ -328,13 +326,9 @@
           <h5 class="modal-title">保存済みルート一覧</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
-
         <div class="modal-body">
-          <ul id="routeList" class="list-group">
-            <!-- JSで追加 -->
-          </ul>
+          <ul id="routeList" class="list-group"></ul>
         </div>
-
         <div class="modal-footer">
           <button class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
         </div>
@@ -342,22 +336,21 @@
     </div>
   </div>
 
-  <!-- ルート読込ボタン -->
   <button id="loadRouteBtn" class="btn btn-warning" style="position:absolute; right:20px; top:260px; z-index:9999;">
     ルート読込
   </button>
-  <!-- 在庫補充モーダル -->
+
   <div class="modal fade" id="restockModal" tabindex="-1" data-bs-backdrop="static">
-    <div class="modal-dialog modal-xl modal-dialog-centered">
-      <div class="modal-content" style="height: 80vh;">
+    <div class="modal-dialog modal-xl modal-fullscreen-md-down modal-dialog-centered">
+      <div class="modal-content modal-desktop-fixed-height">
         <div class="modal-header bg-light">
           <h5 class="modal-title" id="restockModalTitle">在庫補充</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body p-0">
-          <div class="row h-100 g-0">
+          <div class="row h-100 g-0 desktop-h-100">
 
-            <div class="col-md-5 p-4 border-end overflow-auto">
+            <div class="col-md-5 p-4 border-end mobile-border-bottom overflow-auto desktop-h-100 mobile-h-auto">
               <h6 class="mb-3">① 商品を選択</h6>
               <div class="mb-4 position-relative">
                 <input type="text" id="productSearch" class="form-control form-control-lg" placeholder="商品名で検索...">
@@ -393,20 +386,23 @@
               <button id="restockSubmitBtn" type="button" class="btn btn-primary w-100 btn-lg">決定・保存</button>
             </div>
 
-            <div class="col-md-7 p-4 bg-light overflow-auto">
+            <div class="col-md-7 p-4 bg-light overflow-auto desktop-h-100 mobile-h-auto">
               <h6 class="mb-3">この自販機の補充履歴</h6>
-              <table class="table table-bordered table-hover bg-white">
-                <thead class="table-light sticky-top">
-                  <tr>
-                    <th>商品</th>
-                    <th>数</th>
-                    <th>日時</th>
-                    <th>担当</th><th style="width: 60px;">削除</th>
-                  </tr>
-                </thead>
-                <tbody id="restockHistoryTableBody">
-                </tbody>
-              </table>
+              <div class="table-responsive">
+                <table class="table table-bordered table-hover bg-white text-nowrap">
+                  <thead class="table-light sticky-top">
+                    <tr>
+                      <th>商品</th>
+                      <th>数</th>
+                      <th>日時</th>
+                      <th>担当</th>
+                      <th style="width: 60px;">削除</th>
+                    </tr>
+                  </thead>
+                  <tbody id="restockHistoryTableBody">
+                  </tbody>
+                </table>
+              </div>
             </div>
 
           </div>
@@ -414,16 +410,10 @@
       </div>
     </div>
   </div>
-  <!-- Bootstrap JS -->
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
-  <!-- Leaflet -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-  <!--ExtraMarkers の CDN -->
-  <script
-    src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-extra-markers/1.2.1/js/leaflet.extra-markers.min.js"></script>
-  <!-- turf.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-extra-markers/1.2.1/js/leaflet.extra-markers.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
   <script>
     // Flask の session からユーザーIDを取得（整数として扱う）
@@ -431,8 +421,6 @@
     console.log("CURRENT_USER_ID:", CURRENT_USER_ID);
   </script>
 
-  <!-- 外部JS -->
   <script src="{{ url_for('static', filename='js/map.js') }}"></script>
 </body>
-
 </html>

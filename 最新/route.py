@@ -100,3 +100,6 @@ def create_route(app):
     # -----------------------------------------
     # -ここまで-
     # -----------------------------------------
+    @app.route("/api/search_address", methods=["GET"])
+    def search_address():
+        return controller.search_address_proxy()

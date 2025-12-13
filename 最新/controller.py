@@ -1,13 +1,41 @@
 from flask import render_template, jsonify, request, redirect, session, send_file
 from sqlalchemy import func
 from model import db, User, Marker, Product, Restock, Route, RouteMarker
-from datetime import datetime
+from datetime import datetime, timedelta
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 import os
 import openpyxl
 import io
 import pandas as pd
+import requests
+
+def search_address_proxy():
+    # クエリパラメータを取得
+    query = request.args.get("q")
+    if not query:
+        return jsonify([])
+    
+    # Nominatim API のURL
+    url = "https://nominatim.openstreetmap.org/search"
+    
+    # ★サーバー側ならUser-Agentを自由に設定可能
+    headers = {
+        "User-Agent": "SD-4-MapApp/1.0 (your_email@example.com)" # 正しい連絡先に書き換えてください
+    }
+    params = {
+        "format": "json",
+        "q": query
+    }
+    
+    try:
+        # PythonからAPIにリクエスト
+        response = requests.get(url, headers=headers, params=params)
+        response.raise_for_status() # エラーなら例外を発生
+        return jsonify(response.json())
+    except Exception as e:
+        print(f"Nominatim Error: {e}")
+        return jsonify([]), 500
 
 # 改良場所：管理者判定関数
 def is_admin():
@@ -341,10 +369,41 @@ def delete_restock(restock_id):
 
 # ---------- Excel出力 ----------
 def download_excel():
-    # データ取得
-    restocks = Restock.query.order_by(Restock.restocked_at.desc()).all()
-    
-    # データフレーム用リスト作成
+    # 1. パラメータの受け取り
+    range_val = request.args.get('range', 'all')
+    target_val = request.args.get('target', 'all')
+    product_val = request.args.get('product', '')
+
+    # 2. クエリの作成開始
+    query = Restock.query
+
+    # --- 条件: 期間 ---
+    now = datetime.now()
+    if range_val == 'today':
+        start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        query = query.filter(Restock.restocked_at >= start_date)
+    elif range_val == 'week':
+        start_date = now - timedelta(days=7)
+        query = query.filter(Restock.restocked_at >= start_date)
+    elif range_val == 'month':
+        start_date = now - timedelta(days=30)
+        query = query.filter(Restock.restocked_at >= start_date)
+
+    # --- 条件: 対象ユーザー ---
+    if target_val == 'self':
+        current_user_id = session.get('user_id')
+        if current_user_id:
+            query = query.filter(Restock.user_id == current_user_id)
+
+    # --- 条件: 商品名 (Joinが必要) ---
+    if product_val:
+        # Productテーブルを結合して名前で検索
+        query = query.join(Product).filter(Product.name.contains(product_val))
+
+    # 並び替えと実行
+    restocks = query.order_by(Restock.restocked_at.desc()).all()
+
+    # --- 以下、Excel作成処理 (既存のコードとほぼ同じ) ---
     data_list = []
     for r in restocks:
         data_list.append({
@@ -356,20 +415,18 @@ def download_excel():
             "担当者ID": r.user.login_id
         })
     
-    # pandasでDataFrame作成
     df = pd.DataFrame(data_list)
-    
-    # メモリ上のバイナリストリームに出力
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, index=False, sheet_name='補充履歴')
-        
     output.seek(0)
+    
+    filename = f"restock_{range_val}_{datetime.now().strftime('%Y%m%d')}.xlsx"
     
     return send_file(
         output,
         as_attachment=True,
-        download_name=f"restock_history_{datetime.now().strftime('%Y%m%d')}.xlsx",
+        download_name=filename,
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 

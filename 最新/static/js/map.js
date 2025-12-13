@@ -48,20 +48,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // 住所検索関数
 function searchAddress() {
-    const addr = document.getElementById("addressInput").value; // 入力された住所を取得
-    if (!addr) return; // 空欄なら何もしない
+    const addr = document.getElementById("addressInput").value;
+    if (!addr) return;
 
-    // Nominatim API
-    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addr)}`;
-    //apiにfetchでリクエストを送信
-    fetch(url, {
-        headers: {
-            "User-Agent": "MyMapApp/1.0 (contact@example.com)",
-            "Referer": window.location.origin
-        }
-    })
-        .then(response => response.json()) // レスポンスをJSONに変換
-        .then(result => { // 結果処理
+    // 自分のサーバーを経由するURL
+    const url = `/api/search_address?q=${encodeURIComponent(addr)}`;
+
+    fetch(url) // ヘッダー指定は不要
+        .then(response => response.json())
+        .then(result => {
             if (result.length === 0) {
                 alert("該当する住所が見つかりませんでした。");
                 return;

@@ -4,67 +4,135 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>補充支援</title>
+    <title>補充支援 - 履歴・出力</title>
 
-    <!-- Bootstrap -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-
-    <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
     <style>
         body {
-            height: 100vh;
-            overflow: hidden;
             background-color: #fefefe;
         }
 
-        /* 中央配置 */
+        /* 中央配置ラッパー */
         .content-wrapper {
             flex: 1;
             display: flex;
             justify-content: center;
-            align-items: center;
-            padding: 0 20px;
+            padding: 20px;
         }
 
-        /* 中央固定コンテナ（幅を固定し中央に寄せる） */
         .main-center-container {
-            width: 80%;
-            max-width: 900px;
+            width: 100%;
+            max-width: 1200px;
         }
 
-        /* 履歴枠 */
         .history-box {
-            height: 60vh;
             background: #ffffff;
             border: 1px solid #ccc;
             border-radius: 10px;
-            overflow-y: auto;
-            padding: 15px 15px 60px;
-            position: relative;
+            padding: 20px;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            /* overflow-y は削除（CSSメディアクエリで制御） */
         }
 
         .history-table img {
-            width: 50px;
-            height: 50px;
+            width: 40px;
+            height: 40px;
             object-fit: cover;
-            border-radius: 5px;
+            border-radius: 4px;
         }
 
-        /* Excel ボタンを枠の右下に固定 */
-        .excel-btn {
-            position: absolute;
-            bottom: 15px;
-            right: 15px;
+        /* -------------------------------------------
+           PC・タブレット向け (幅768px以上)
+           画面の高さを固定し、内部スクロールさせる
+           ------------------------------------------- */
+        @media (min-width: 768px) {
+            body {
+                height: 100vh;
+                overflow: hidden; /* 全体スクロール禁止 */
+            }
+
+            .content-wrapper {
+                align-items: center; /* 上下中央寄せ */
+                height: calc(100vh - 56px); /* ヘッダー分を引く */
+            }
+
+            .history-box {
+                height: 85vh; /* 高さを固定 */
+                display: flex;
+                flex-direction: column;
+            }
+
+            .box-inner-row {
+                height: 100%; /* 親の高さいっぱい */
+            }
+
+            /* 右側のテーブルエリアだけスクロール */
+            .scrollable-col {
+                height: 100%;
+                overflow-y: auto;
+            }
+            
+            /* 左側のフィルターエリア */
+            .filter-col {
+                height: 100%;
+                display: flex;
+                flex-direction: column;
+                overflow-y: auto; /* 画面が縦に短いPC用 */
+            }
+        }
+
+        /* -------------------------------------------
+           スマホ向け (幅767.98px以下)
+           縦並びにして、全体をスクロールさせる
+           ------------------------------------------- */
+        @media (max-width: 767.98px) {
+            body {
+                height: auto;
+                overflow-y: auto;
+            }
+
+            .content-wrapper {
+                align-items: flex-start;
+                padding: 10px;
+                height: auto;
+            }
+
+            .history-box {
+                height: auto !important; /* 高さを中身に合わせる */
+            }
+            
+            .box-inner-row {
+                height: auto;
+            }
+
+            /* 左カラム（フィルター）と右カラム（表）の間に線を引く */
+            .filter-col {
+                border-right: none !important; /* PC用の線を消す */
+                border-bottom: 1px solid #dee2e6;
+                padding-bottom: 20px;
+                margin-bottom: 20px;
+                padding-right: 0 !important; /* PC用の余白を消す */
+            }
+            
+            .scrollable-col {
+                padding-left: 0 !important; /* PC用の余白を消す */
+                height: auto;
+                overflow: visible;
+            }
+            
+            /* テーブルのヘッダー固定をスマホでは解除（画面が狭くなるため）
+               もし固定したい場合はここを削除してください */
+            .sticky-top {
+                position: static !important; 
+            }
         }
     </style>
 </head>
 
 <body class="d-flex flex-column">
 
-    <!-- ヘッダー -->
     <header>
         <nav class="navbar navbar-expand-lg navbar-dark" style="background-color: #ADD8E6;">
             <div class="container-fluid">
@@ -78,38 +146,91 @@
     <div class="content-wrapper">
         <div class="main-center-container">
             <div class="history-box">
-                <h5 class="mb-3">補充履歴一覧</h5>
+                <div class="row box-inner-row">
+                    
+                    <div class="col-md-4 border-end pe-4 filter-col">
+                        <h5 class="mb-3"><i class="bi bi-sliders"></i> 出力・表示条件</h5>
 
-                <table class="table table-bordered history-table align-middle">
-                    <thead class="table-light">
-                        <tr>
-                            <th style="width: 70px;">画像</th>
-                            <th>商品名</th>
-                            <th>補充数</th>
-                            <th>補充自販機名</th>
-                            <th>日付</th>
-                            <th style="width: 90px;">削除</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    </tbody>
-                </table>
+                        <form id="filterForm">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold text-secondary small">期間</label>
+                                <div class="d-flex flex-wrap gap-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="dateRange" id="rangeAll" value="all" checked>
+                                        <label class="form-check-label" for="rangeAll">全期間</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="dateRange" id="rangeToday" value="today">
+                                        <label class="form-check-label" for="rangeToday">今日</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="dateRange" id="rangeWeek" value="week">
+                                        <label class="form-check-label" for="rangeWeek">1週間</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="dateRange" id="rangeMonth" value="month">
+                                        <label class="form-check-label" for="rangeMonth">1ヶ月</label>
+                                    </div>
+                                </div>
+                            </div>
 
-                <button class="btn btn-success excel-btn">
-                    <i class="bi bi-file-earmark-excel"></i> Excelに出力
-                </button>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold text-secondary small">対象ユーザー</label>
+                                <select class="form-select" id="targetUser">
+                                    <option value="all">全員</option>
+                                    <option value="self">自分のみ</option>
+                                </select>
+                            </div>
 
+                            <div class="mb-4">
+                                <label class="form-label fw-bold text-secondary small">商品名 (部分一致)</label>
+                                <input type="text" class="form-control" id="productFilter" placeholder="例: コーラ">
+                            </div>
+                        </form>
+
+                        <div class="mt-auto">
+                            <hr class="d-none d-md-block"> <div class="d-grid gap-2">
+                                <button type="button" class="btn btn-outline-primary" id="applyFilterBtn">
+                                    <i class="bi bi-filter"></i> 条件で絞り込み
+                                </button>
+                                <button type="button" class="btn btn-success excel-btn">
+                                    <i class="bi bi-file-earmark-excel"></i> Excelに出力
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-8 ps-4 scrollable-col">
+                        <h5 class="mb-3">履歴一覧</h5>
+                        
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover history-table align-middle text-nowrap">
+                                <thead class="table-light sticky-top" style="top: 0; z-index: 10;">
+                                    <tr>
+                                        <th style="width: 50px;">画像</th>
+                                        <th>商品名</th>
+                                        <th>数</th>
+                                        <th>自販機</th>
+                                        <th>日付</th>
+                                        <th>担当</th>
+                                        <th style="width: 60px;">削除</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="historyTableBody">
+                                    </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- フッター -->
-    <footer class="text-light text-end px-3 py-2" style="background-color: #ADD8E6;">
-        文教大学 情報学部 情報システム学科 プロジェクト演習BC
+    <footer class="text-light text-end px-3 py-2 mt-auto" style="background-color: #ADD8E6;">
+        <small>プロジェクト演習BC</small>
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
     <script src="{{ url_for('static', filename='js/post.js') }}"></script>
 </body>
 
