@@ -21,7 +21,7 @@ def search_address_proxy():
     
     # ★サーバー側ならUser-Agentを自由に設定可能
     headers = {
-        "User-Agent": "SD-4-MapApp/1.0 (your_email@example.com)" # 正しい連絡先に書き換えてください
+        "User-Agent": "SD-4-MapApp/1.0 (c4p31048@bunkyo.ac.jp)" # 正しい連絡先に書き換えてください
     }
     params = {
         "format": "json",
