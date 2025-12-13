@@ -63,33 +63,9 @@
       border: none !important;
     }
 
-    .routeGeneration-btn {
-      position: absolute;
-      bottom: 15px;
-      right: 15px;
-      z-index: 1000;
-    }
-
-    #saveRouteBtn {
-      position: absolute;
-      right: 20px;
-      top: 170px;
-      z-index: 9999;
-      padding: 10px 16px;
-      font-size: 14px;
-      border-radius: 8px;
-      white-space: nowrap;
-    }
 
     .toggle-btn {
       bottom: 60px;
-    }
-
-    .currentLocationStartBtn {
-      position: absolute;
-      bottom: 105px;
-      right: 15px;
-      z-index: 1000;
     }
 
     .dir-step {
@@ -145,30 +121,86 @@
         border-right: none !important;
       }
     }
+    .bottom-right-controls {
+      position: absolute;
+      bottom: 30px;
+      right: 20px;
+      z-index: 1000;
+      display: flex;
+      flex-direction: column; /* 縦並び */
+      gap: 12px; /* ボタン間の隙間 */
+      align-items: flex-end; /* 右寄せ */
+      pointer-events: none; /* コンテナ自体はクリックを邪魔しない */
+    }
+
+    /* ボタン共通スタイル */
+    .btn-stylish {
+      pointer-events: auto; /* ボタンはクリック可能にする */
+      border-radius: 50px; /* 丸みをつける */
+      padding: 10px 20px;
+      font-weight: 600;
+      border: none;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.15); /* 影 */
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px; /* アイコンと文字の間隔 */
+      width: fit-content;
+      color: #fff !important; /* 文字色を白に強制 */
+    }
+
+    /* ホバー時の動き */
+    .btn-stylish:hover {
+      transform: translateY(-3px); /* 少し浮き上がる */
+      box-shadow: 0 6px 12px rgba(0,0,0,0.25);
+    }
+
+    /* 個別の色設定（グラデーションでオシャレに） */
+    .btn-load { background: linear-gradient(135deg, #f39c12, #f1c40f); } /* 黄色系 */
+    .btn-save { background: linear-gradient(135deg, #27ae60, #2ecc71); } /* 緑系 */
+    .btn-mode { background: linear-gradient(135deg, #8e44ad, #9b59b6); } /* 紫系 */
+    .btn-loc  { background: linear-gradient(135deg, #34495e, #7f8c8d); } /* グレー系 */
+    
+    /* ルート生成ボタンは一番目立たせる */
+    .btn-gen { 
+      background: linear-gradient(135deg, #2980b9, #3498db); /* 青系 */
+      padding: 14px 28px; /* 少し大きく */
+      font-size: 1.1rem;
+    }
   </style>
 </head>
 
 <body>
   <div id="map"></div>
   
-  <button class="btn btn-dark menu-btn" data-bs-toggle="offcanvas" data-bs-target="#menu">
-    ☰
-  </button>
-
+  <button class="btn btn-dark menu-btn" data-bs-toggle="offcanvas" data-bs-target="#menu">☰</button>
   <input type="text" id="addressInput" class="form-control search-bar" placeholder="住所を検索">
-  <button id="modeToggleBtn" class="btn btn-primary mode-btn">
-    🔵 通常モード
-  </button>
-  <button id="routingModeToggleBtn" class="btn btn-secondary routeGeneration-btn toggle-btn">
-    ルート方式：最短
-  </button>
-  <button id="routeGenerationBtn" class="btn btn-primary routeGeneration-btn">
-    ルート生成
-  </button>
-  <button id="currentLocationStartBtn" class="btn btn-primary currentLocationStartBtn">
-    現在地をSにする
-  </button>
-  <button id="saveRouteBtn" class="btn btn-success">ルート保存</button>
+  
+  <button id="modeToggleBtn" class="btn btn-primary mode-btn">🔵 通常モード</button>
+
+  <div class="bottom-right-controls">
+    
+    <button id="loadRouteBtn" class="btn btn-stylish btn-load">
+      <i class="bi bi-folder2-open"></i> ルート読込
+    </button>
+
+    <button id="saveRouteBtn" class="btn btn-stylish btn-save">
+      <i class="bi bi-save"></i> ルート保存
+    </button>
+
+    <button id="routingModeToggleBtn" class="btn btn-stylish btn-mode">
+      <i class="bi bi-signpost-split"></i> ルート方式：最短
+    </button>
+
+    <button id="currentLocationStartBtn" class="btn btn-stylish btn-loc">
+      <i class="bi bi-geo-alt-fill"></i> 現在地をS
+    </button>
+
+    <button id="routeGenerationBtn" class="btn btn-stylish btn-gen">
+      <i class="bi bi-map-fill"></i> ルート生成
+    </button>
+
+  </div>
   <div class="offcanvas offcanvas-start" tabindex="-1" id="menu">
     <div class="offcanvas-header">
       <h5 class="offcanvas-title">メニュー</h5>
@@ -334,10 +366,6 @@
       </div>
     </div>
   </div>
-
-  <button id="loadRouteBtn" class="btn btn-warning" style="position:absolute; right:20px; top:260px; z-index:9999;">
-    ルート読込
-  </button>
 
   <div class="modal fade" id="restockModal" tabindex="-1" data-bs-backdrop="static">
     <div class="modal-dialog modal-xl modal-fullscreen-md-down modal-dialog-centered">

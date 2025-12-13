@@ -1,0 +1,97 @@
+-- phpMyAdmin SQL Dump
+-- version 5.2.1
+-- https://www.phpmyadmin.net/
+--
+-- ホスト: 127.0.0.1
+-- 生成日時: 2025-12-13 10:43:50
+-- サーバのバージョン： 10.4.32-MariaDB
+-- PHP のバージョン: 8.2.12
+
+SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
+START TRANSACTION;
+SET time_zone = "+00:00";
+
+
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!40101 SET NAMES utf8mb4 */;
+
+--
+-- データベース: `sd-4`
+--
+
+-- --------------------------------------------------------
+
+--
+-- テーブルの構造 `route_markers`
+--
+
+CREATE TABLE `route_markers` (
+  `id` int(11) NOT NULL,
+  `route_id` int(11) NOT NULL,
+  `marker_id` int(11) DEFAULT NULL,
+  `lat` double NOT NULL,
+  `lng` double NOT NULL,
+  `order_num` int(11) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- テーブルのデータのダンプ `route_markers`
+--
+
+INSERT INTO `route_markers` (`id`, `route_id`, `marker_id`, `lat`, `lng`, `order_num`) VALUES
+(1, 1, 6, 35.39865311812369, 139.464408159256, 1),
+(2, 1, 8, 35.397231958828975, 139.46268081665042, 2),
+(3, 2, 12, 35.39995618986267, 139.46381807327273, 1),
+(4, 2, 6, 35.39865311812369, 139.464408159256, 2),
+(5, 2, 8, 35.397231958828975, 139.46268081665042, 3),
+(6, 3, 3, 35.39602941986086, 139.46510285139084, 1),
+(7, 3, 2, 35.396320217291745, 139.46608453989032, 2),
+(8, 3, 4, 35.39689087687094, 139.46483194828036, 3),
+(9, 4, 2, 35.396320217291745, 139.46608453989032, 1),
+(10, 4, 3, 35.39602941986086, 139.46510285139084, 2),
+(11, 4, 8, 35.397231958828975, 139.46268081665042, 3),
+(12, 4, 12, 35.39995618986267, 139.46381807327273, 4),
+(13, 4, 5, 35.3977785615221, 139.46810960769656, 5),
+(14, 5, 2, 35.396320217291745, 139.46608453989032, 1),
+(15, 5, 3, 35.39602941986086, 139.46510285139084, 2),
+(16, 5, 8, 35.397231958828975, 139.46268081665042, 3),
+(17, 5, 12, 35.39995618986267, 139.46381807327273, 4),
+(18, 5, 4, 35.39689087687094, 139.46483194828036, 5);
+
+--
+-- ダンプしたテーブルのインデックス
+--
+
+--
+-- テーブルのインデックス `route_markers`
+--
+ALTER TABLE `route_markers`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `route_id` (`route_id`);
+
+--
+-- ダンプしたテーブルの AUTO_INCREMENT
+--
+
+--
+-- テーブルの AUTO_INCREMENT `route_markers`
+--
+ALTER TABLE `route_markers`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=19;
+
+--
+-- ダンプしたテーブルの制約
+--
+
+--
+-- テーブルの制約 `route_markers`
+--
+ALTER TABLE `route_markers`
+  ADD CONSTRAINT `rm_route_fk` FOREIGN KEY (`route_id`) REFERENCES `routes` (`id`) ON DELETE CASCADE;
+COMMIT;
+
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
